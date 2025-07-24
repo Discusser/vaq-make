@@ -8,6 +8,7 @@
 void declaration(vaq_make_gen *gen);
 void statement(vaq_make_gen *gen);
 void print_statement(vaq_make_gen *gen);
+void include_statement(vaq_make_gen *gen);
 void expression_statement(vaq_make_gen *gen);
 vaq_make_value expression(vaq_make_gen *gen);
 vaq_make_value assigment(vaq_make_gen *gen);

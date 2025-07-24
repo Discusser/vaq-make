@@ -16,12 +16,35 @@ static void error(vaq_make_gen *gen, const char *message);
 static void error_at(vaq_make_gen *gen, vaq_make_token token, const char *message);
 static void error_at_current(vaq_make_gen *gen, const char *message);
 
-bool vaq_make_generate_build(vaq_make_scanner *scanner) {
+bool vaq_make_generate_build(vaq_make_scanner *scanner, const char *file_path) {
   vaq_make_gen gen;
+  gen.file_name = strrchr(file_path, '/');
+  if (gen.file_name == NULL)
+    gen.file_name = file_path;
+  else
+    gen.file_name++;
   gen.scanner = scanner;
   gen.had_error = false;
   gen.panic_mode = false;
   gen.stack_size = 0;
+
+  // TODO: Store a hash table of native functions in vaq_make_gen. This table is populated in
+  // vaq_make_generate_build. Because vaq_make_generate_build is currently called for each file, and
+  // multi-file support is planned, it might be wiser to make the vaq_make_gen struct encapsulate
+  // multiple files. One way to do this is by having an `enclosing` field in the struct, which
+  // points to the parent vaq_make_gen.
+  // For each included file, a child is created. It's also important to not fall into the trap of
+  // recursively reading files (recursive includes). This can be fixed by importing a file only once
+  // by storing (probably absolute) file paths in a hash set and checking against the set each time
+  // we read a file.
+  // We can also share data across files using an `enclosing` field, simply by
+  // setting child->field_to_share = child->enclosing->field_to_share. This is important for native
+  // functions, but will also probably be useful for sharing variables. Design note : is it better
+  // to share only variables marked with `export`, or to share variables by default, and allow a
+  // `noexport` attribute or something similar. It's quite rare to have a variable that shouldn't be
+  // shared in build generators. Maybe a simpler solution would be to only share global variables,
+  // which would also force the notion of scope and a distiction between locals and globals.
+
   vaq_make_variable_array_new(&gen.variables);
 
   consume(&gen);
@@ -106,6 +129,8 @@ void declaration(vaq_make_gen *gen) { statement(gen); }
 void statement(vaq_make_gen *gen) {
   if (match(gen, TOKEN_PRINT)) {
     print_statement(gen);
+  } else if (match(gen, TOKEN_INCLUDE)) {
+    include_statement(gen);
   } else {
     expression_statement(gen);
   }
@@ -119,7 +144,13 @@ void print_statement(vaq_make_gen *gen) {
   consume_expected(gen, TOKEN_LEFT_PAREN, "Expected '(' after 'print'.");
   vaq_make_value_print(grouping(gen));
   printf("\n");
-  consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after expression.");
+  consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after print ')'.");
+}
+
+void include_statement(vaq_make_gen *gen) {
+  vaq_make_value val = string(gen);
+  // TODO: Implement
+  consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after include string.");
 }
 
 void expression_statement(vaq_make_gen *gen) {
@@ -204,14 +235,31 @@ vaq_make_value term(vaq_make_gen *gen) {
     vaq_make_token op = previous(gen);
     vaq_make_value rhs = factor(gen);
 
-    if (lhs.type == VAL_NUMBER && rhs.type == VAL_NUMBER) {
-      if (op.type == TOKEN_PLUS) {
+    bool both_numbers = lhs.type == VAL_NUMBER && rhs.type == VAL_NUMBER;
+    bool both_str = lhs.type == VAL_OBJ && rhs.type == VAL_OBJ && lhs.as.obj->type == OBJ_STRING &&
+                    rhs.as.obj->type == OBJ_STRING;
+    if (op.type == TOKEN_PLUS) {
+      if (both_numbers) {
         lhs = vaq_make_value_number(lhs.as.number + rhs.as.number);
-      } else if (op.type == TOKEN_MINUS) {
-        lhs = vaq_make_value_number(lhs.as.number - rhs.as.number);
+      } else if (both_str) {
+        vaq_make_obj_string *lhs_str = (vaq_make_obj_string *)lhs.as.obj;
+        vaq_make_obj_string *rhs_str = (vaq_make_obj_string *)rhs.as.obj;
+        int buf_len = lhs_str->length + rhs_str->length;
+        char *buf = malloc(sizeof(char) * (buf_len + 1));
+        memcpy(buf, lhs_str->chars, lhs_str->length);
+        memcpy(buf + lhs_str->length, rhs_str->chars, rhs_str->length);
+        buf[buf_len] = '\0';
+        vaq_make_obj_string *result = vaq_make_obj_string_new(buf, buf_len, false);
+        return vaq_make_value_obj((vaq_make_obj *)result);
+      } else {
+        error(gen, "Expected numbers or strings for addition.");
       }
-    } else {
-      error(gen, "Expected numbers for addition or subtraction.");
+    } else if (op.type == TOKEN_MINUS) {
+      if (both_numbers) {
+        lhs = vaq_make_value_number(lhs.as.number - rhs.as.number);
+      } else {
+        error(gen, "Expected numbers for subtraction.");
+      }
     }
   }
 
@@ -264,14 +312,16 @@ vaq_make_value call(vaq_make_gen *gen) {
 
   // TODO: Implement this for functions and property access
   //
-  // while (true) {
-  //   if (match(gen, TOKEN_LEFT_PAREN)) {
-  //     vaq_make_value_array args = arguments(gen);
-  //     consume_expected(gen, TOKEN_RIGHT_PAREN, "Expected ')' after argument list");
-  //     val = call_value(gen, val, args);
-  //   } else if (match(gen, TOKEN_DOT)) {
-  //   }
-  // }
+  while (true) {
+    if (match(gen, TOKEN_LEFT_PAREN)) {
+      vaq_make_value_array args = arguments(gen);
+      consume_expected(gen, TOKEN_RIGHT_PAREN, "Expected ')' after argument list");
+      val = call_value(gen, val, args);
+      vaq_make_value_array_free(&args);
+    }
+    // else if (match(gen, TOKEN_DOT)) {
+    // }
+  }
 
   return val;
 }
@@ -316,8 +366,9 @@ vaq_make_value number(vaq_make_gen *gen) { return vaq_make_value_number(atof(pre
 
 vaq_make_value string(vaq_make_gen *gen) {
   // TODO: Implement
-  error(gen, "Operation is not yet implemented.");
-  return vaq_make_value_nil();
+  vaq_make_token token = previous(gen);
+  vaq_make_obj_string *obj = vaq_make_obj_string_new((char *)token.name, token.name_length, true);
+  return vaq_make_value_obj((vaq_make_obj *)obj);
 }
 
 vaq_make_value identifier(vaq_make_gen *gen) {

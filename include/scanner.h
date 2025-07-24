@@ -27,6 +27,7 @@ typedef enum vaq_make_token_type {
   TOKEN_FALSE,
   TOKEN_TRUE,
   TOKEN_NULL,
+  TOKEN_INCLUDE,
 } vaq_make_token_type;
 
 typedef struct vaq_make_token {

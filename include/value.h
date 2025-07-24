@@ -5,6 +5,8 @@
 
 typedef enum vaq_make_value_type { VAL_NUMBER, VAL_BOOL, VAL_NIL, VAL_OBJ } vaq_make_value_type;
 
+typedef struct vaq_make_obj vaq_make_obj;
+
 typedef struct vaq_make_value {
   vaq_make_value_type type;
   union {

@@ -1,6 +1,8 @@
 #include "scanner.h"
 #include "scanner-priv.h"
 #include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void consume_ignored(vaq_make_scanner *scanner);
@@ -8,6 +10,32 @@ static char consume(vaq_make_scanner *scanner);
 static char peek(vaq_make_scanner *scanner);
 static bool is_eof(vaq_make_scanner *scanner);
 static bool match(vaq_make_scanner *scanner, char c);
+
+char *read_file(const char *path, size_t *file_size) {
+  FILE *file = fopen(path, "r");
+  if (!file) {
+    fprintf(stderr, "An error occurred while trying to open file at '%s'.\n", path);
+  }
+  fseek(file, 0, SEEK_END);
+  size_t size = ftell(file);
+  rewind(file);
+  char *source = malloc(sizeof(char) * (size + 1));
+  if (source == NULL) {
+    fprintf(stderr, "Could not allocate buffer to store file at \"%s\"\n", path);
+    exit(1);
+  }
+  size_t bytes_read = fread(source, sizeof(char), size, file);
+  if (bytes_read < size) {
+    fprintf(stderr, "Could not read file at '%s'\n", path);
+    exit(1);
+  }
+  source[bytes_read] = '\0';
+  fclose(file);
+
+  if (file_size != NULL)
+    *file_size = size;
+  return source;
+}
 
 vaq_make_scanner vaq_make_init_scanner(const char *source) {
   vaq_make_scanner scanner;
@@ -148,6 +176,8 @@ vaq_make_token_type identifier_type(vaq_make_scanner *scanner) {
   switch (*scanner->token_start) {
   case 'f':
     return check_keyword(scanner, 1, 4, "alse", TOKEN_FALSE);
+  case 'i':
+    return check_keyword(scanner, 1, 6, "nclude", TOKEN_INCLUDE);
   case 'n':
     return check_keyword(scanner, 1, 3, "ull", TOKEN_NULL);
   case 'p':

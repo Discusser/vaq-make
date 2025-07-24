@@ -7,8 +7,9 @@ program = declaration* EOF;
 
 declaration = statement ;
 
-statement = print_statement | expression_statement ;
+statement = print_statement | include_statement | expression_statement ;
 print_statement = print grouping ";" ;
+include_statement = include string ";" ;
 expression_statement = expression ";" ;
 
 expression = assignment ;

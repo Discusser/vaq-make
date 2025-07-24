@@ -11,6 +11,7 @@ typedef struct vaq_make_variable {
 } vaq_make_variable;
 
 typedef struct vaq_make_gen {
+  const char *file_name;
   vaq_make_scanner *scanner;
   vaq_make_variable_array variables;
   vaq_make_value *stack[256];
@@ -21,4 +22,4 @@ typedef struct vaq_make_gen {
   bool panic_mode;
 } vaq_make_gen;
 
-bool vaq_make_generate_build(vaq_make_scanner *scanner);
+bool vaq_make_generate_build(vaq_make_scanner *scanner, const char *file_path);

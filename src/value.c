@@ -51,9 +51,7 @@ char *vaq_make_value_to_string(vaq_make_value val) {
     strcpy(buf, "null");
     break;
   case VAL_OBJ:
-    buf = malloc(sizeof(char) * 9);
-    strcpy(buf, "[Object]");
-    break;
+    buf = vaq_make_obj_to_string(val.as.obj);
   }
 
   return buf;

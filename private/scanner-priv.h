@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+char *read_file(const char *path, size_t *file_size);
+
 bool is_identifier_char(char c, bool first);
 
 vaq_make_token make_number(vaq_make_scanner *scanner);
