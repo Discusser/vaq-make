@@ -5,7 +5,8 @@ project(vaq-make VERSION 0.1.0)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_TYPE Debug)
 
-add_executable(vaq-make src/scanner.c src/vaq-make.c src/generator.c)
+add_executable(vaq-make src/array.c src/generator.c src/object.c src/scanner.c
+                        src/value.c src/vaq-make.c)
 target_include_directories(
   vaq-make
   PUBLIC include/
