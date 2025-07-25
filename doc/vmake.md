@@ -3,7 +3,7 @@
 ## Grammar
 
 ```ebnf
-program = declaration* EOF;
+program = declaration* EOF ;
 
 declaration = statement ;
 
