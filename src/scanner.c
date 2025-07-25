@@ -14,7 +14,11 @@ static bool match(vmake_scanner *scanner, char c);
 char *read_file(const char *path, size_t *file_size) {
   FILE *file = fopen(path, "r");
   if (!file) {
-    fprintf(stderr, "An error occurred while trying to open file at '%s'.\n", path);
+    fprintf(stderr,
+            "An error occurred while trying to open file at '%s'. The file either doesn't exist or "
+            "requires elevated permissions.\n",
+            path);
+    exit(1);
   }
   fseek(file, 0, SEEK_END);
   size_t size = ftell(file);
@@ -93,6 +97,10 @@ vmake_token vmake_scan_token(vmake_scanner *scanner) {
     return make_token(scanner, TOKEN_SLASH);
   case ',':
     return make_token(scanner, TOKEN_COMMA);
+  case '[':
+    return make_token(scanner, TOKEN_LEFT_SQUARE_BRACKET);
+  case ']':
+    return make_token(scanner, TOKEN_RIGHT_SQUARE_BRACKET);
   case '"':
     return make_string(scanner);
   }

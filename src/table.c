@@ -1,4 +1,5 @@
 #include "table.h"
+#include "object.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,8 +126,6 @@ vmake_obj_string *vmake_table_find_string(vmake_table *table, const char *chars,
   if (table->count == 0)
     return NULL;
 
-  // NOTE: Is it possible for the table to be full of tombstones, making this
-  // loop infinite?
   int index = hash & (table->capacity - 1);
 
   while (true) {

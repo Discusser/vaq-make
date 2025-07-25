@@ -12,19 +12,25 @@ typedef struct vmake_variable {
   int depth;
 } vmake_variable;
 
-typedef struct vmake_gen {
-  const char *file_name;
-  vmake_scanner *scanner;
+typedef struct vmake_state {
+  vmake_obj *objects;
   vmake_table globals;
   vmake_table strings;
+  vmake_value_array include_stack;
+  bool had_error;
+  bool panic_mode;
+} vmake_state;
+
+typedef struct vmake_gen {
+  const char *file_path;
+  vmake_state *state;
+  vmake_scanner *scanner;
   vmake_variable_array locals;
   vmake_value *stack[256];
   vmake_token previous;
   vmake_token current;
   int stack_size;
   int scope_depth;
-  bool had_error;
-  bool panic_mode;
 } vmake_gen;
 
-bool vmake_generate_build(vmake_scanner *scanner, const char *file_path);
+bool vmake_generate_build(vmake_scanner *scanner, vmake_state *state, const char *file_path);

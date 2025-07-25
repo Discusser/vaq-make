@@ -1,7 +1,10 @@
 #include "generator.h"
 #include "array.h"
+#include "common.h"
+#include "file.h"
 #include "generator-priv.h"
 #include "native.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,30 +20,34 @@ static void error(vmake_gen *gen, const char *message);
 static void error_at(vmake_gen *gen, vmake_token token, const char *message);
 static void error_at_current(vmake_gen *gen, const char *message);
 
-bool vmake_generate_build(vmake_scanner *scanner, const char *file_path) {
+static vmake_value *pop(vmake_gen *gen);
+
+bool vmake_generate_build(vmake_scanner *scanner, vmake_state *state, const char *file_path) {
   vmake_gen gen;
-  gen.file_name = strrchr(file_path, '/');
-  if (gen.file_name == NULL)
-    gen.file_name = file_path;
-  else
-    gen.file_name++;
+  gen.state = state;
+  gen.file_path = file_path;
+
+  vmake_value path_key = vmake_value_obj(
+      (vmake_obj *)vmake_obj_string_new(gen.state, (char *)file_path, strlen(file_path), true));
+  if (vmake_value_array_contains(&gen.state->include_stack, path_key)) {
+    error_at(&gen, (vmake_token){.type = TOKEN_NONE}, "Cyclic include detected");
+    for (int i = gen.state->include_stack.size - 1; i >= 0; i--) {
+      printf("  included from '%s'\n",
+             ((vmake_obj_string *)gen.state->include_stack.values[i].as.obj)->chars);
+    }
+    exit(1);
+  }
+  vmake_value_array_push(&gen.state->include_stack, path_key);
+
   gen.scanner = scanner;
-  gen.had_error = false;
-  gen.panic_mode = false;
+  gen.previous.type = TOKEN_NONE;
+  gen.current.type = TOKEN_NONE;
   gen.stack_size = 0;
   gen.scope_depth = 0;
 
-  // TODO: Create a struct, vmake_shared, that contains data shared between multiple VMake files
-  // (globals and strings, potentially more later on). This way, files included with 'include' can
-  // share data with their parents and with previously included files. Each vmake_gen should point
-  // to the global vmake_shared. In order to prohibit cyclic dependencies, vmake_shared should also
-  // contain a hash table (used as a hash set) that marks which absolute file paths have been
-  // visited.
-  vmake_table_init(&gen.globals);
-  vmake_table_init(&gen.strings);
   vmake_variable_array_new(&gen.locals);
 
-  vmake_define_natives(&gen);
+  vmake_define_natives(gen.state);
 
   consume(&gen);
   while (!check(&gen, TOKEN_EOF)) {
@@ -48,11 +55,13 @@ bool vmake_generate_build(vmake_scanner *scanner, const char *file_path) {
   }
   consume_expected(&gen, TOKEN_EOF, "Expected end of expression.");
 
-  return !gen.had_error;
+  vmake_value_array_pop(&gen.state->include_stack);
+
+  return !gen.state->had_error;
 }
 
 static void synchronize(vmake_gen *gen) {
-  gen->panic_mode = false;
+  gen->state->panic_mode = false;
 
   while (gen->current.type != TOKEN_EOF) {
     if (gen->previous.type == TOKEN_SEMICOLON)
@@ -102,17 +111,21 @@ static bool match(vmake_gen *gen, vmake_token_type type) {
 static void error(vmake_gen *gen, const char *message) { error_at(gen, gen->previous, message); }
 
 static void error_at(vmake_gen *gen, vmake_token token, const char *message) {
-  if (gen->panic_mode)
+  if (gen->state->panic_mode)
     return;
-  gen->panic_mode = true;
-  fprintf(stderr, "[line %d] ERROR ", token.line + 1);
-  if (token.type == TOKEN_EOF) {
-    fprintf(stderr, "at end");
-  } else if (token.type != TOKEN_ERROR) {
-    fprintf(stderr, "at '%.*s'", token.name_length, token.name);
+  gen->state->panic_mode = true;
+  if (token.type == TOKEN_NONE) {
+    fprintf(stderr, "[%s] ERROR", gen->file_path);
+  } else {
+    fprintf(stderr, "[%s:%d] ERROR ", gen->file_path, token.line + 1);
+    if (token.type == TOKEN_EOF) {
+      fprintf(stderr, "at end");
+    } else if (token.type != TOKEN_ERROR) {
+      fprintf(stderr, "at '%.*s'", token.name_length, token.name);
+    }
   }
   fprintf(stderr, ": %s\n", message);
-  gen->had_error = true;
+  gen->state->had_error = true;
 }
 
 static void error_at_current(vmake_gen *gen, const char *message) {
@@ -130,7 +143,7 @@ void statement(vmake_gen *gen) {
     expression_statement(gen);
   }
 
-  if (gen->panic_mode) {
+  if (gen->state->panic_mode) {
     synchronize(gen);
   }
 }
@@ -143,8 +156,24 @@ void print_statement(vmake_gen *gen) {
 }
 
 void include_statement(vmake_gen *gen) {
-  vmake_value val = string(gen);
-  // TODO: Implement
+  vmake_value val = expression(gen);
+  if (!vmake_value_is_string(val)) {
+    error(gen, "Expected string after 'include'");
+    return;
+  }
+
+  char *include_path = ((vmake_obj_string *)val.as.obj)->chars;
+  printf("Including '%s'\n", include_path);
+  char *new_path = vmake_path_rel(gen->file_path, include_path);
+  if (new_path == NULL) {
+    char *str;
+    asprintf(&str, "No file with path '%s' was found", include_path);
+    error(gen, str);
+    free(str);
+    return;
+  }
+  vmake_process_path(gen->state, new_path);
+  free(new_path);
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after include string.");
 }
 
@@ -158,12 +187,12 @@ vmake_value expression(vmake_gen *gen) { return assigment(gen); }
 vmake_value assigment(vmake_gen *gen) {
   bool is_identifier = check(gen, TOKEN_IDENTIFIER);
   vmake_value val = equality(gen);
+  vmake_token prev = previous(gen);
 
   if (match(gen, TOKEN_EQUAL)) {
     // If the left hand side is an identifier, then the pointer should be on the stack.
-    vmake_value *val_ptr = gen->stack_size == 0 ? NULL : gen->stack[gen->stack_size - 1];
+    vmake_value *val_ptr = resolve_variable(gen, prev);
     vmake_value rhs = assigment(gen);
-    printf("lhs = %p\n", val_ptr);
     if (is_identifier) {
       assign_variable(gen, val_ptr, rhs);
     } else {
@@ -245,7 +274,7 @@ vmake_value term(vmake_gen *gen) {
         memcpy(buf, lhs_str->chars, lhs_str->length);
         memcpy(buf + lhs_str->length, rhs_str->chars, rhs_str->length);
         buf[buf_len] = '\0';
-        vmake_obj_string *result = vmake_obj_string_new(gen, buf, buf_len, false);
+        vmake_obj_string *result = vmake_obj_string_new(gen->state, buf, buf_len, false);
         lhs = vmake_value_obj((vmake_obj *)result);
       } else {
         error(gen, "Expected numbers or strings for addition.");
@@ -300,7 +329,66 @@ vmake_value unary(vmake_gen *gen) {
     }
   }
 
-  return call(gen);
+  return subscript(gen);
+}
+
+vmake_value subscript(vmake_gen *gen) {
+  vmake_value val = call(gen);
+  vmake_token prev = previous(gen);
+
+  while (match(gen, TOKEN_LEFT_SQUARE_BRACKET)) {
+    vmake_value *target = resolve_variable(gen, prev);
+
+    if (target == NULL) {
+      error(gen, "Cannot index into null value.");
+      break;
+    }
+
+    vmake_value index = expression(gen);
+    if (index.type != VAL_NUMBER) {
+      char *str;
+      asprintf(&str, "Expected number for array subscript, found '%s' instead.",
+               vmake_value_to_string(index));
+      error(gen, str);
+      free(str);
+      break;
+    }
+
+    size_t index_trunc = trunc(index.as.number);
+    if (index_trunc != index.as.number || fabs(index.as.number) > SIZE_MAX) {
+      char *str;
+      asprintf(&str, "Invalid number for array subscript %s.", vmake_value_to_string(index));
+      error(gen, str);
+      free(str);
+      break;
+    }
+
+    if (!vmake_value_is_array(*target)) {
+      char *str;
+      asprintf(&str, "Expected array as subscript target, found '%s' instead.",
+               vmake_value_to_string(*target));
+      error(gen, str);
+      free(str);
+      break;
+    }
+
+    vmake_obj_array *arr = (vmake_obj_array *)val.as.obj;
+    if (index_trunc >= arr->array->size) {
+      char *str;
+      asprintf(&str, "Array subscript index %zu is too big for array of size %i.", index_trunc,
+               arr->array->size);
+      error(gen, str);
+      free(str);
+      break;
+    }
+
+    // Once we've checked all the possibles cases, we can finally just index into the array.
+    val = arr->array->values[index_trunc];
+
+    consume_expected(gen, TOKEN_RIGHT_SQUARE_BRACKET, "Expected ']' after array subscript.");
+  }
+
+  return val;
 }
 
 vmake_value call(vmake_gen *gen) {
@@ -342,6 +430,8 @@ vmake_value primary(vmake_gen *gen) {
     return vmake_value_bool(true);
   } else if (match(gen, TOKEN_NULL)) {
     return vmake_value_nil();
+  } else if (match(gen, TOKEN_LEFT_SQUARE_BRACKET)) {
+    return array(gen);
   } else if (match(gen, TOKEN_NUMBER)) {
     return number(gen);
   } else if (match(gen, TOKEN_STRING)) {
@@ -357,6 +447,16 @@ vmake_value primary(vmake_gen *gen) {
 }
 
 vmake_value_array arguments(vmake_gen *gen) {
+  // TODO: Implement kwargs. That means that this function should return a vmake_arguments struct
+  // defined like so:
+  //
+  // struct vmake_arguments {
+  //  vmake_value_array args;
+  //  vmake_table kwargs;
+  // }
+  //
+  // kwargs must imperatively come after the last positional argument. Reading a positional argument
+  // after a keyword argument is an error.
   vmake_value_array arr;
   vmake_value_array_new(&arr);
   do {
@@ -371,11 +471,22 @@ vmake_value grouping(vmake_gen *gen) {
   return val;
 }
 
+vmake_value array(vmake_gen *gen) {
+  vmake_value_array arr;
+  vmake_value_array_new(&arr);
+  do {
+    vmake_value_array_push(&arr, assigment(gen));
+  } while (match(gen, TOKEN_COMMA));
+  consume_expected(gen, TOKEN_RIGHT_SQUARE_BRACKET, "Expected ']' after array.");
+  return vmake_value_obj((vmake_obj *)vmake_obj_array_new(gen->state, arr));
+}
+
 vmake_value number(vmake_gen *gen) { return vmake_value_number(atof(previous(gen).name)); }
 
 vmake_value string(vmake_gen *gen) {
   vmake_token token = previous(gen);
-  vmake_obj_string *obj = vmake_obj_string_new(gen, (char *)token.name, token.name_length, true);
+  vmake_obj_string *obj =
+      vmake_obj_string_new(gen->state, (char *)token.name, token.name_length, true);
   return vmake_value_obj((vmake_obj *)obj);
 }
 
@@ -403,7 +514,6 @@ vmake_value identifier(vmake_gen *gen) {
   }
 
   gen->stack[gen->stack_size++] = res;
-  printf("Resolved %.*s to %p\n", name.name_length, name.name, res);
   return *res;
 }
 
@@ -444,7 +554,6 @@ vmake_value *resolve_local(vmake_gen *gen, vmake_token name) {
     if (variable->name.name_length == name.name_length &&
         strncmp(variable->name.name, name.name, name.name_length) == 0) {
       vmake_value *ptr = &variable->value;
-      gen->stack[gen->stack_size++] = ptr;
       return ptr;
     }
   }
@@ -453,12 +562,13 @@ vmake_value *resolve_local(vmake_gen *gen, vmake_token name) {
 }
 
 vmake_value *resolve_global(vmake_gen *gen, vmake_token name) {
-  vmake_obj_string *str = vmake_obj_string_new(gen, (char *)name.name, name.name_length, true);
+  vmake_obj_string *str =
+      vmake_obj_string_new(gen->state, (char *)name.name, name.name_length, true);
   vmake_value key = vmake_value_obj((vmake_obj *)str);
   vmake_value *value = NULL;
 
   // Try to retrieve the value, or create it if it doesn't exist
-  vmake_table_get(&gen->globals, key, &value);
+  vmake_table_get(&gen->state->globals, key, &value);
 
   return value;
 }
@@ -475,12 +585,18 @@ vmake_value *create_local(vmake_gen *gen, vmake_token name) {
 }
 
 vmake_value *create_global(vmake_gen *gen, vmake_token name) {
-  vmake_obj_string *str = vmake_obj_string_new(gen, (char *)name.name, name.name_length, true);
+  vmake_obj_string *str =
+      vmake_obj_string_new(gen->state, (char *)name.name, name.name_length, true);
   vmake_value key = vmake_value_obj((vmake_obj *)str);
 
   vmake_value value = vmake_value_nil();
   vmake_value *inserted;
-  vmake_table_put_ret(&gen->globals, key, &value, &inserted);
+  vmake_table_put_ret(&gen->state->globals, key, &value, &inserted);
 
   return inserted;
+}
+
+static vmake_value *pop(vmake_gen *gen) {
+  return gen->stack_size == 0 ? (error(gen, "Tried to pop from empty stack."), NULL)
+                              : gen->stack[gen->stack_size--];
 }

@@ -24,6 +24,15 @@ void vmake_value_array_push(vmake_value_array *arr, vmake_value val) {
 
 vmake_value vmake_value_array_pop(vmake_value_array *arr) { return arr->values[--arr->size]; }
 
+bool vmake_value_array_contains(vmake_value_array *arr, vmake_value val) {
+  for (int i = 0; i < arr->size; i++) {
+    if (vmake_value_equals(arr->values[i], val)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void vmake_variable_array_new(vmake_variable_array *arr) {
   arr->values = NULL;
   arr->capacity = 0;

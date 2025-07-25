@@ -1,4 +1,5 @@
 #include "value.h"
+#include "object.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +24,10 @@ bool vmake_value_is_string(vmake_value val) {
 
 bool vmake_value_is_native(vmake_value val) {
   return vmake_value_is_obj(val) && val.as.obj->type == OBJ_NATIVE;
+}
+
+bool vmake_value_is_array(vmake_value val) {
+  return vmake_value_is_obj(val) && val.as.obj->type == OBJ_ARRAY;
 }
 
 uint32_t vmake_value_hash(vmake_value val) {
@@ -113,8 +118,11 @@ bool vmake_value_equals(vmake_value a, vmake_value b) {
     return true;
   case VAL_OBJ:
     return a.as.obj == b.as.obj;
-    break;
+  case VAL_EMPTY:
+    return false;
   }
+
+  return false;
 }
 
 int vmake_value_compare(vmake_value a, vmake_value b) {
@@ -127,6 +135,7 @@ int vmake_value_compare(vmake_value a, vmake_value b) {
   case VAL_BOOL:
   case VAL_NIL:
   case VAL_OBJ:
+  case VAL_EMPTY:
     return 0;
     break;
   }

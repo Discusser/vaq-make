@@ -1,3 +1,4 @@
+#include "common.h"
 #include "generator.h"
 #include "scanner-priv.h"
 #include "scanner.h"
@@ -10,10 +11,25 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  char *source = read_file(argv[1], NULL);
-  vmake_scanner scanner = vmake_init_scanner(source);
-  vmake_generate_build(&scanner, argv[1]);
-  free(source);
+  vmake_state state;
+  vmake_table_init(&state.globals);
+  vmake_table_init(&state.strings);
+  vmake_value_array_new(&state.include_stack);
+
+  char *path = realpath(argv[1], NULL);
+  vmake_process_path(&state, path);
+  free(path);
+
+  vmake_value_array_free(&state.include_stack);
+  vmake_table_free(&state.strings);
+  vmake_table_free(&state.globals);
 
   return 0;
+}
+
+void vmake_process_path(vmake_state *state, char *path) {
+  char *source = read_file(path, NULL);
+  vmake_scanner scanner = vmake_init_scanner(source);
+  vmake_generate_build(&scanner, state, path);
+  free(source);
 }

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "object.h"
 #include <stdbool.h>
 #include <stdint.h>
+
+typedef struct vmake_obj vmake_obj;
 
 typedef enum vmake_value_type {
   VAL_EMPTY,
@@ -32,6 +33,7 @@ vmake_value vmake_value_obj(vmake_obj *obj);
 bool vmake_value_is_obj(vmake_value val);
 bool vmake_value_is_string(vmake_value val);
 bool vmake_value_is_native(vmake_value val);
+bool vmake_value_is_array(vmake_value val);
 
 uint32_t vmake_value_hash(vmake_value val);
 

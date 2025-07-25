@@ -5,6 +5,8 @@
 
 #define VMAKE_TABLE_LOAD_FACTOR 0.5
 
+typedef struct vmake_obj_string vmake_obj_string;
+
 typedef struct vmake_table_entry {
   vmake_value key;
   vmake_value *value;

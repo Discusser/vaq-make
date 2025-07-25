@@ -18,15 +18,17 @@ equality = comparison ( ( "==" | "!=" ) comparison )* ;
 comparison = term ( ( "<" | "<=" | ">" | ">=" ) term )* ;
 term = factor ( ( "+" | "-" ) factor )* ;
 factor = unary ( ( "*" | "/" ) unary )* ;
-unary = ( ( "!" | "-" ) unary ) | call;
+unary = ( ( "!" | "-" ) unary ) | subscript;
+subscript = call ( "[" expression "]" )* ;
 call = primary ( ( "(" arguments? ")" ) | ( "." identifier ) )*;
-primary = number | string | literal | grouping | identifier ;
+primary = number | string | literal | array | grouping | identifier ;
 
-arguments = assignment ( "," assignment )* ;
+arguments = assignment ( "," assignment )* ( "," identifier "=" assignment )* ;
 grouping = "(" expression ")" ;
 number = digit_excluding_zero digit* ;
 string = """ ascii_character_excluding_zero """ ;
 literal = "true" | "false" | "null" ;
+array = "[" assignment ( "," assignment )* "]"
 identifier = ( alphabetical | "_" ) ( alphanumerical | "_" )* ;
 
 digit_excluding_zero = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;

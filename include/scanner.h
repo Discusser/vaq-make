@@ -1,6 +1,7 @@
 #pragma once
 
 typedef enum vmake_token_type {
+  TOKEN_NONE,
   TOKEN_EOF,
   TOKEN_ERROR,
   TOKEN_SEMICOLON,
@@ -28,6 +29,8 @@ typedef enum vmake_token_type {
   TOKEN_TRUE,
   TOKEN_NULL,
   TOKEN_INCLUDE,
+  TOKEN_LEFT_SQUARE_BRACKET,
+  TOKEN_RIGHT_SQUARE_BRACKET,
 } vmake_token_type;
 
 typedef struct vmake_token {

@@ -8,6 +8,7 @@ set(CMAKE_BUILD_TYPE Debug)
 add_executable(
   vaq-make
   src/array.c
+  src/file.c
   src/generator.c
   src/native.c
   src/object.c
@@ -19,3 +20,4 @@ target_include_directories(
   vaq-make
   PUBLIC include/
   PRIVATE private/)
+target_link_libraries(vaq-make m)

@@ -21,6 +21,7 @@ void vmake_value_array_new(vmake_value_array *arr);
 void vmake_value_array_free(vmake_value_array *arr);
 void vmake_value_array_push(vmake_value_array *arr, vmake_value val);
 vmake_value vmake_value_array_pop(vmake_value_array *arr);
+bool vmake_value_array_contains(vmake_value_array *arr, vmake_value val);
 
 void vmake_variable_array_new(vmake_variable_array *arr);
 void vmake_variable_array_free(vmake_variable_array *arr);
