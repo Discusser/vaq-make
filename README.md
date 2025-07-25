@@ -6,6 +6,10 @@ vaq-make uses a special language called VMake.
 
 I made this project to learn a bit more about domain-specific languages, and because I thought it would be fun to implement one. In order to demonstrate that this program works, my end goal is to be able to rewrite this project's `CMakeLists.txt` file using VMake.
 
+## Usage
+
+This projects provides a `vaq-make` executable. One command line argument can be passed: the name of the file to be processed. This is expected to be a VMake file (optionally with the `.vmake` extension, even though that doesn't matter). The grammar for the VMake language can be found in the documentation.
+
 ## Building
 
 To build from source, run the following commands:
