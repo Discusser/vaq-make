@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+vmake_value vmake_value_empty() { return (vmake_value){VAL_EMPTY, {.number = 0}}; }
+
 vmake_value vmake_value_number(double number) {
   return (vmake_value){VAL_NUMBER, {.number = number}};
 }
@@ -12,6 +14,41 @@ vmake_value vmake_value_bool(bool boolean) { return (vmake_value){VAL_BOOL, {.bo
 vmake_value vmake_value_nil() { return (vmake_value){VAL_NIL, {.number = 0}}; }
 
 vmake_value vmake_value_obj(vmake_obj *obj) { return (vmake_value){VAL_OBJ, {.obj = obj}}; }
+
+bool vmake_value_is_obj(vmake_value val) { return val.type == VAL_OBJ; }
+
+bool vmake_value_is_string(vmake_value val) {
+  return vmake_value_is_obj(val) && val.as.obj->type == OBJ_STRING;
+}
+
+bool vmake_value_is_native(vmake_value val) {
+  return vmake_value_is_obj(val) && val.as.obj->type == OBJ_NATIVE;
+}
+
+uint32_t vmake_value_hash(vmake_value val) {
+  switch (val.type) {
+  case VAL_BOOL:
+    return val.as.boolean;
+  case VAL_NIL:
+    return 3;
+  case VAL_NUMBER: {
+    union bitcast {
+      double value;
+      uint32_t ints[2];
+    };
+
+    union bitcast cast;
+    cast.value = (val.as.number) + 1.0;
+    return cast.ints[0] + cast.ints[1];
+  }
+  case VAL_OBJ:
+    if (val.as.obj->type == OBJ_STRING)
+      return ((vmake_obj_string *)val.as.obj)->hash;
+    return (uint32_t)(intptr_t)val.as.obj;
+  default:
+    return 0;
+  }
+}
 
 char *vmake_value_to_string(vmake_value val) {
   char *buf;
@@ -45,6 +82,10 @@ char *vmake_value_to_string(vmake_value val) {
   case VAL_NIL:
     buf = malloc(sizeof(char) * 5);
     strcpy(buf, "null");
+    break;
+  case VAL_EMPTY:
+    buf = malloc(sizeof(char) * 6);
+    strcpy(buf, "empty");
     break;
   case VAL_OBJ:
     buf = vmake_obj_to_string(val.as.obj);

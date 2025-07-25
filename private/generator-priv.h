@@ -28,3 +28,7 @@ vmake_value identifier(vmake_gen *gen);
 vmake_value assign_variable(vmake_gen *gen, vmake_value *lhs, vmake_value rhs);
 vmake_value call_value(vmake_gen *gen, vmake_value val, vmake_value_array args);
 vmake_value *resolve_variable(vmake_gen *gen, vmake_token name);
+vmake_value *resolve_local(vmake_gen *gen, vmake_token name);
+vmake_value *resolve_global(vmake_gen *gen, vmake_token name);
+vmake_value *create_local(vmake_gen *gen, vmake_token name);
+vmake_value *create_global(vmake_gen *gen, vmake_token name);

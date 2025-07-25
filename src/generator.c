@@ -1,6 +1,7 @@
 #include "generator.h"
 #include "array.h"
 #include "generator-priv.h"
+#include "native.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,25 +28,19 @@ bool vmake_generate_build(vmake_scanner *scanner, const char *file_path) {
   gen.had_error = false;
   gen.panic_mode = false;
   gen.stack_size = 0;
+  gen.scope_depth = 0;
 
-  // TODO: Store a hash table of native functions in vmake_gen. This table is populated in
-  // vmake_generate_build. Because vmake_generate_build is currently called for each file, and
-  // multi-file support is planned, it might be wiser to make the vmake_gen struct encapsulate
-  // multiple files. One way to do this is by having an `enclosing` field in the struct, which
-  // points to the parent vmake_gen.
-  // For each included file, a child is created. It's also important to not fall into the trap of
-  // recursively reading files (recursive includes). This can be fixed by importing a file only once
-  // by storing (probably absolute) file paths in a hash set and checking against the set each time
-  // we read a file.
-  // We can also share data across files using an `enclosing` field, simply by
-  // setting child->field_to_share = child->enclosing->field_to_share. This is important for native
-  // functions, but will also probably be useful for sharing variables. Design note : is it better
-  // to share only variables marked with `export`, or to share variables by default, and allow a
-  // `noexport` attribute or something similar. It's quite rare to have a variable that shouldn't be
-  // shared in build generators. Maybe a simpler solution would be to only share global variables,
-  // which would also force the notion of scope and a distiction between locals and globals.
+  // TODO: Create a struct, vmake_shared, that contains data shared between multiple VMake files
+  // (globals and strings, potentially more later on). This way, files included with 'include' can
+  // share data with their parents and with previously included files. Each vmake_gen should point
+  // to the global vmake_shared. In order to prohibit cyclic dependencies, vmake_shared should also
+  // contain a hash table (used as a hash set) that marks which absolute file paths have been
+  // visited.
+  vmake_table_init(&gen.globals);
+  vmake_table_init(&gen.strings);
+  vmake_variable_array_new(&gen.locals);
 
-  vmake_variable_array_new(&gen.variables);
+  vmake_define_natives(&gen);
 
   consume(&gen);
   while (!check(&gen, TOKEN_EOF)) {
@@ -168,6 +163,7 @@ vmake_value assigment(vmake_gen *gen) {
     // If the left hand side is an identifier, then the pointer should be on the stack.
     vmake_value *val_ptr = gen->stack_size == 0 ? NULL : gen->stack[gen->stack_size - 1];
     vmake_value rhs = assigment(gen);
+    printf("lhs = %p\n", val_ptr);
     if (is_identifier) {
       assign_variable(gen, val_ptr, rhs);
     } else {
@@ -249,8 +245,8 @@ vmake_value term(vmake_gen *gen) {
         memcpy(buf, lhs_str->chars, lhs_str->length);
         memcpy(buf + lhs_str->length, rhs_str->chars, rhs_str->length);
         buf[buf_len] = '\0';
-        vmake_obj_string *result = vmake_obj_string_new(buf, buf_len, false);
-        return vmake_value_obj((vmake_obj *)result);
+        vmake_obj_string *result = vmake_obj_string_new(gen, buf, buf_len, false);
+        lhs = vmake_value_obj((vmake_obj *)result);
       } else {
         error(gen, "Expected numbers or strings for addition.");
       }
@@ -310,14 +306,27 @@ vmake_value unary(vmake_gen *gen) {
 vmake_value call(vmake_gen *gen) {
   vmake_value val = primary(gen);
 
-  // TODO: Implement this for functions and property access
-  //
+  // TODO: Implement this for property access
   while (true) {
     if (match(gen, TOKEN_LEFT_PAREN)) {
       vmake_value_array args = arguments(gen);
       consume_expected(gen, TOKEN_RIGHT_PAREN, "Expected ')' after argument list");
+      if (vmake_value_is_native(val)) {
+        vmake_obj_native *native = (vmake_obj_native *)val.as.obj;
+        if (native->arity != args.size) {
+          char *str;
+          char *native_name = vmake_obj_to_string((vmake_obj *)native);
+          asprintf(&str, "Expected %i arguments for native function '%s' but found %i instead.",
+                   native->arity, native_name, args.size);
+          free(native_name);
+          error(gen, str);
+          free(str);
+        }
+      }
       val = call_value(gen, val, args);
       vmake_value_array_free(&args);
+    } else {
+      break;
     }
     // else if (match(gen, TOKEN_DOT)) {
     // }
@@ -365,17 +374,37 @@ vmake_value grouping(vmake_gen *gen) {
 vmake_value number(vmake_gen *gen) { return vmake_value_number(atof(previous(gen).name)); }
 
 vmake_value string(vmake_gen *gen) {
-  // TODO: Implement
   vmake_token token = previous(gen);
-  vmake_obj_string *obj = vmake_obj_string_new((char *)token.name, token.name_length, true);
+  vmake_obj_string *obj = vmake_obj_string_new(gen, (char *)token.name, token.name_length, true);
   return vmake_value_obj((vmake_obj *)obj);
 }
 
 vmake_value identifier(vmake_gen *gen) {
-  vmake_value *res = resolve_variable(gen, previous(gen));
-  if (res)
-    return *res;
-  return vmake_value_nil();
+  vmake_token name = previous(gen);
+  vmake_value *res = NULL;
+  // If we're in a global scope, we first look for a global variable, and create it if it doesn't
+  // exist.
+  if (gen->scope_depth == 0) {
+    res = resolve_global(gen, name);
+    if (!res)
+      res = create_global(gen, name);
+  }
+
+  // If we're inside a local scope, we look for a local variable first, then a global variable, and
+  // finally we create a local variable if nothing was found
+  if (gen->scope_depth > 0) {
+    res = resolve_local(gen, name);
+    if (!res) {
+      res = resolve_global(gen, name);
+    }
+    if (!res) {
+      res = create_local(gen, name);
+    }
+  }
+
+  gen->stack[gen->stack_size++] = res;
+  printf("Resolved %.*s to %p\n", name.name_length, name.name, res);
+  return *res;
 }
 
 vmake_value assign_variable(vmake_gen *gen, vmake_value *lhs, vmake_value rhs) {
@@ -386,30 +415,72 @@ vmake_value assign_variable(vmake_gen *gen, vmake_value *lhs, vmake_value rhs) {
 }
 
 vmake_value call_value(vmake_gen *gen, vmake_value val, vmake_value_array args) {
-  error(gen, "Operation is not yet implemented.");
+  switch (val.as.obj->type) {
+  case OBJ_NATIVE: {
+    vmake_obj_native *native = (vmake_obj_native *)val.as.obj;
+    return native->function(args.size, args.values);
+  }
+  default:
+    error(gen, "Object is not callable.");
+    break;
+  }
   return vmake_value_nil();
 }
 
 vmake_value *resolve_variable(vmake_gen *gen, vmake_token name) {
+  if (gen->scope_depth == 0)
+    return resolve_global(gen, name);
+
+  return resolve_local(gen, name);
+}
+
+vmake_value *resolve_local(vmake_gen *gen, vmake_token name) {
+  if (gen->locals.size == 0)
+    return NULL;
+
   // If variable exists, return it
-  for (int i = 0; i < gen->variables.size; i++) {
-    vmake_variable *variable = &gen->variables.values[i];
+  for (int i = gen->locals.size; i >= 0; i--) {
+    vmake_variable *variable = &gen->locals.values[i];
     if (variable->name.name_length == name.name_length &&
         strncmp(variable->name.name, name.name, name.name_length) == 0) {
-      return &variable->value;
+      vmake_value *ptr = &variable->value;
+      gen->stack[gen->stack_size++] = ptr;
+      return ptr;
     }
   }
 
-  // If variable doesn't exist, create it
+  return NULL;
+}
+
+vmake_value *resolve_global(vmake_gen *gen, vmake_token name) {
+  vmake_obj_string *str = vmake_obj_string_new(gen, (char *)name.name, name.name_length, true);
+  vmake_value key = vmake_value_obj((vmake_obj *)str);
+  vmake_value *value = NULL;
+
+  // Try to retrieve the value, or create it if it doesn't exist
+  vmake_table_get(&gen->globals, key, &value);
+
+  return value;
+}
+
+vmake_value *create_local(vmake_gen *gen, vmake_token name) {
   vmake_variable variable;
   variable.name = name;
   variable.value = vmake_value_nil();
-  vmake_variable_array_push(&gen->variables, variable);
+  vmake_variable_array_push(&gen->locals, variable);
 
-  // Return the copy of our variable from the heap.
-  vmake_value *ptr = &gen->variables.values[gen->variables.size - 1].value;
-  // Push the pointer onto the stack.
-  gen->stack[gen->stack_size++] = ptr;
+  vmake_value *ptr = &gen->locals.values[gen->locals.size - 1].value;
 
   return ptr;
+}
+
+vmake_value *create_global(vmake_gen *gen, vmake_token name) {
+  vmake_obj_string *str = vmake_obj_string_new(gen, (char *)name.name, name.name_length, true);
+  vmake_value key = vmake_value_obj((vmake_obj *)str);
+
+  vmake_value value = vmake_value_nil();
+  vmake_value *inserted;
+  vmake_table_put_ret(&gen->globals, key, &value, &inserted);
+
+  return inserted;
 }
