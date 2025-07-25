@@ -5,19 +5,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void synchronize(vaq_make_gen *gen);
-static vaq_make_token previous(vaq_make_gen *gen);
-static vaq_make_token consume(vaq_make_gen *gen);
-static void consume_expected(vaq_make_gen *gen, vaq_make_token_type type, const char *message);
-static bool check(vaq_make_gen *gen, vaq_make_token_type type);
-static bool match(vaq_make_gen *gen, vaq_make_token_type type);
+static void synchronize(vmake_gen *gen);
+static vmake_token previous(vmake_gen *gen);
+static vmake_token consume(vmake_gen *gen);
+static void consume_expected(vmake_gen *gen, vmake_token_type type, const char *message);
+static bool check(vmake_gen *gen, vmake_token_type type);
+static bool match(vmake_gen *gen, vmake_token_type type);
 
-static void error(vaq_make_gen *gen, const char *message);
-static void error_at(vaq_make_gen *gen, vaq_make_token token, const char *message);
-static void error_at_current(vaq_make_gen *gen, const char *message);
+static void error(vmake_gen *gen, const char *message);
+static void error_at(vmake_gen *gen, vmake_token token, const char *message);
+static void error_at_current(vmake_gen *gen, const char *message);
 
-bool vaq_make_generate_build(vaq_make_scanner *scanner, const char *file_path) {
-  vaq_make_gen gen;
+bool vmake_generate_build(vmake_scanner *scanner, const char *file_path) {
+  vmake_gen gen;
   gen.file_name = strrchr(file_path, '/');
   if (gen.file_name == NULL)
     gen.file_name = file_path;
@@ -28,11 +28,11 @@ bool vaq_make_generate_build(vaq_make_scanner *scanner, const char *file_path) {
   gen.panic_mode = false;
   gen.stack_size = 0;
 
-  // TODO: Store a hash table of native functions in vaq_make_gen. This table is populated in
-  // vaq_make_generate_build. Because vaq_make_generate_build is currently called for each file, and
-  // multi-file support is planned, it might be wiser to make the vaq_make_gen struct encapsulate
+  // TODO: Store a hash table of native functions in vmake_gen. This table is populated in
+  // vmake_generate_build. Because vmake_generate_build is currently called for each file, and
+  // multi-file support is planned, it might be wiser to make the vmake_gen struct encapsulate
   // multiple files. One way to do this is by having an `enclosing` field in the struct, which
-  // points to the parent vaq_make_gen.
+  // points to the parent vmake_gen.
   // For each included file, a child is created. It's also important to not fall into the trap of
   // recursively reading files (recursive includes). This can be fixed by importing a file only once
   // by storing (probably absolute) file paths in a hash set and checking against the set each time
@@ -45,7 +45,7 @@ bool vaq_make_generate_build(vaq_make_scanner *scanner, const char *file_path) {
   // shared in build generators. Maybe a simpler solution would be to only share global variables,
   // which would also force the notion of scope and a distiction between locals and globals.
 
-  vaq_make_variable_array_new(&gen.variables);
+  vmake_variable_array_new(&gen.variables);
 
   consume(&gen);
   while (!check(&gen, TOKEN_EOF)) {
@@ -56,7 +56,7 @@ bool vaq_make_generate_build(vaq_make_scanner *scanner, const char *file_path) {
   return !gen.had_error;
 }
 
-static void synchronize(vaq_make_gen *gen) {
+static void synchronize(vmake_gen *gen) {
   gen->panic_mode = false;
 
   while (gen->current.type != TOKEN_EOF) {
@@ -72,13 +72,13 @@ static void synchronize(vaq_make_gen *gen) {
   }
 }
 
-static vaq_make_token previous(vaq_make_gen *gen) { return gen->previous; }
+static vmake_token previous(vmake_gen *gen) { return gen->previous; }
 
-static vaq_make_token consume(vaq_make_gen *gen) {
+static vmake_token consume(vmake_gen *gen) {
   gen->previous = gen->current;
 
   while (true) {
-    gen->current = vaq_make_scan_token(gen->scanner);
+    gen->current = vmake_scan_token(gen->scanner);
     if (gen->current.type != TOKEN_ERROR)
       break;
 
@@ -88,15 +88,15 @@ static vaq_make_token consume(vaq_make_gen *gen) {
   return gen->current;
 }
 
-static void consume_expected(vaq_make_gen *gen, vaq_make_token_type type, const char *message) {
+static void consume_expected(vmake_gen *gen, vmake_token_type type, const char *message) {
   if (!match(gen, type)) {
     error_at_current(gen, message);
   }
 }
 
-static bool check(vaq_make_gen *gen, vaq_make_token_type type) { return gen->current.type == type; }
+static bool check(vmake_gen *gen, vmake_token_type type) { return gen->current.type == type; }
 
-static bool match(vaq_make_gen *gen, vaq_make_token_type type) {
+static bool match(vmake_gen *gen, vmake_token_type type) {
   if (check(gen, type)) {
     consume(gen);
     return true;
@@ -104,9 +104,9 @@ static bool match(vaq_make_gen *gen, vaq_make_token_type type) {
   return false;
 }
 
-static void error(vaq_make_gen *gen, const char *message) { error_at(gen, gen->previous, message); }
+static void error(vmake_gen *gen, const char *message) { error_at(gen, gen->previous, message); }
 
-static void error_at(vaq_make_gen *gen, vaq_make_token token, const char *message) {
+static void error_at(vmake_gen *gen, vmake_token token, const char *message) {
   if (gen->panic_mode)
     return;
   gen->panic_mode = true;
@@ -120,13 +120,13 @@ static void error_at(vaq_make_gen *gen, vaq_make_token token, const char *messag
   gen->had_error = true;
 }
 
-static void error_at_current(vaq_make_gen *gen, const char *message) {
+static void error_at_current(vmake_gen *gen, const char *message) {
   error_at(gen, gen->current, message);
 }
 
-void declaration(vaq_make_gen *gen) { statement(gen); }
+void declaration(vmake_gen *gen) { statement(gen); }
 
-void statement(vaq_make_gen *gen) {
+void statement(vmake_gen *gen) {
   if (match(gen, TOKEN_PRINT)) {
     print_statement(gen);
   } else if (match(gen, TOKEN_INCLUDE)) {
@@ -140,34 +140,34 @@ void statement(vaq_make_gen *gen) {
   }
 }
 
-void print_statement(vaq_make_gen *gen) {
+void print_statement(vmake_gen *gen) {
   consume_expected(gen, TOKEN_LEFT_PAREN, "Expected '(' after 'print'.");
-  vaq_make_value_print(grouping(gen));
+  vmake_value_print(grouping(gen));
   printf("\n");
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after print ')'.");
 }
 
-void include_statement(vaq_make_gen *gen) {
-  vaq_make_value val = string(gen);
+void include_statement(vmake_gen *gen) {
+  vmake_value val = string(gen);
   // TODO: Implement
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after include string.");
 }
 
-void expression_statement(vaq_make_gen *gen) {
+void expression_statement(vmake_gen *gen) {
   expression(gen);
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after expression.");
 }
 
-vaq_make_value expression(vaq_make_gen *gen) { return assigment(gen); }
+vmake_value expression(vmake_gen *gen) { return assigment(gen); }
 
-vaq_make_value assigment(vaq_make_gen *gen) {
+vmake_value assigment(vmake_gen *gen) {
   bool is_identifier = check(gen, TOKEN_IDENTIFIER);
-  vaq_make_value val = equality(gen);
+  vmake_value val = equality(gen);
 
   if (match(gen, TOKEN_EQUAL)) {
     // If the left hand side is an identifier, then the pointer should be on the stack.
-    vaq_make_value *val_ptr = gen->stack_size == 0 ? NULL : gen->stack[gen->stack_size - 1];
-    vaq_make_value rhs = assigment(gen);
+    vmake_value *val_ptr = gen->stack_size == 0 ? NULL : gen->stack[gen->stack_size - 1];
+    vmake_value rhs = assigment(gen);
     if (is_identifier) {
       assign_variable(gen, val_ptr, rhs);
     } else {
@@ -179,32 +179,32 @@ vaq_make_value assigment(vaq_make_gen *gen) {
   return val;
 }
 
-vaq_make_value equality(vaq_make_gen *gen) {
-  vaq_make_value lhs = comparison(gen);
+vmake_value equality(vmake_gen *gen) {
+  vmake_value lhs = comparison(gen);
 
   while (match(gen, TOKEN_EQUAL_EQUAL) || match(gen, TOKEN_NOT_EQUAL)) {
-    vaq_make_token op = previous(gen);
-    vaq_make_value rhs = comparison(gen);
-    bool res = vaq_make_value_equals(lhs, rhs);
+    vmake_token op = previous(gen);
+    vmake_value rhs = comparison(gen);
+    bool res = vmake_value_equals(lhs, rhs);
     if (op.type == TOKEN_NOT_EQUAL)
       res = !res;
-    lhs = vaq_make_value_bool(res);
+    lhs = vmake_value_bool(res);
   }
 
   return lhs;
 }
 
-vaq_make_value comparison(vaq_make_gen *gen) {
-  vaq_make_value lhs = term(gen);
+vmake_value comparison(vmake_gen *gen) {
+  vmake_value lhs = term(gen);
 
   while (match(gen, TOKEN_LESS) || match(gen, TOKEN_LESS_EQUAL) || match(gen, TOKEN_GREATER) ||
          match(gen, TOKEN_GREATER_EQUAL)) {
-    vaq_make_token op = previous(gen);
-    vaq_make_value rhs = term(gen);
+    vmake_token op = previous(gen);
+    vmake_value rhs = term(gen);
     if (lhs.type != VAL_NUMBER || rhs.type != VAL_NUMBER) {
       error(gen, "Expected numbers for comparison operation.");
     }
-    int cmp = vaq_make_value_compare(lhs, rhs);
+    int cmp = vmake_value_compare(lhs, rhs);
     bool res = false;
     switch (op.type) {
     case TOKEN_LESS:
@@ -222,41 +222,41 @@ vaq_make_value comparison(vaq_make_gen *gen) {
     default:
       break;
     }
-    lhs = vaq_make_value_bool(res);
+    lhs = vmake_value_bool(res);
   }
 
   return lhs;
 }
 
-vaq_make_value term(vaq_make_gen *gen) {
-  vaq_make_value lhs = factor(gen);
+vmake_value term(vmake_gen *gen) {
+  vmake_value lhs = factor(gen);
 
   while (match(gen, TOKEN_PLUS) || match(gen, TOKEN_MINUS)) {
-    vaq_make_token op = previous(gen);
-    vaq_make_value rhs = factor(gen);
+    vmake_token op = previous(gen);
+    vmake_value rhs = factor(gen);
 
     bool both_numbers = lhs.type == VAL_NUMBER && rhs.type == VAL_NUMBER;
     bool both_str = lhs.type == VAL_OBJ && rhs.type == VAL_OBJ && lhs.as.obj->type == OBJ_STRING &&
                     rhs.as.obj->type == OBJ_STRING;
     if (op.type == TOKEN_PLUS) {
       if (both_numbers) {
-        lhs = vaq_make_value_number(lhs.as.number + rhs.as.number);
+        lhs = vmake_value_number(lhs.as.number + rhs.as.number);
       } else if (both_str) {
-        vaq_make_obj_string *lhs_str = (vaq_make_obj_string *)lhs.as.obj;
-        vaq_make_obj_string *rhs_str = (vaq_make_obj_string *)rhs.as.obj;
+        vmake_obj_string *lhs_str = (vmake_obj_string *)lhs.as.obj;
+        vmake_obj_string *rhs_str = (vmake_obj_string *)rhs.as.obj;
         int buf_len = lhs_str->length + rhs_str->length;
         char *buf = malloc(sizeof(char) * (buf_len + 1));
         memcpy(buf, lhs_str->chars, lhs_str->length);
         memcpy(buf + lhs_str->length, rhs_str->chars, rhs_str->length);
         buf[buf_len] = '\0';
-        vaq_make_obj_string *result = vaq_make_obj_string_new(buf, buf_len, false);
-        return vaq_make_value_obj((vaq_make_obj *)result);
+        vmake_obj_string *result = vmake_obj_string_new(buf, buf_len, false);
+        return vmake_value_obj((vmake_obj *)result);
       } else {
         error(gen, "Expected numbers or strings for addition.");
       }
     } else if (op.type == TOKEN_MINUS) {
       if (both_numbers) {
-        lhs = vaq_make_value_number(lhs.as.number - rhs.as.number);
+        lhs = vmake_value_number(lhs.as.number - rhs.as.number);
       } else {
         error(gen, "Expected numbers for subtraction.");
       }
@@ -266,18 +266,18 @@ vaq_make_value term(vaq_make_gen *gen) {
   return lhs;
 }
 
-vaq_make_value factor(vaq_make_gen *gen) {
-  vaq_make_value lhs = unary(gen);
+vmake_value factor(vmake_gen *gen) {
+  vmake_value lhs = unary(gen);
 
   while (match(gen, TOKEN_STAR) || match(gen, TOKEN_SLASH)) {
-    vaq_make_token op = previous(gen);
-    vaq_make_value rhs = unary(gen);
+    vmake_token op = previous(gen);
+    vmake_value rhs = unary(gen);
 
     if (lhs.type == VAL_NUMBER && rhs.type == VAL_NUMBER) {
       if (op.type == TOKEN_STAR) {
-        lhs = vaq_make_value_number(lhs.as.number * rhs.as.number);
+        lhs = vmake_value_number(lhs.as.number * rhs.as.number);
       } else if (op.type == TOKEN_SLASH) {
-        lhs = vaq_make_value_number(lhs.as.number / rhs.as.number);
+        lhs = vmake_value_number(lhs.as.number / rhs.as.number);
       }
     } else {
       error(gen, "Expected numbers for multiplication or division.");
@@ -287,18 +287,18 @@ vaq_make_value factor(vaq_make_gen *gen) {
   return lhs;
 }
 
-vaq_make_value unary(vaq_make_gen *gen) {
+vmake_value unary(vmake_gen *gen) {
   if (match(gen, TOKEN_NOT)) {
-    vaq_make_value val = unary(gen);
+    vmake_value val = unary(gen);
     if (val.type == VAL_BOOL) {
-      return vaq_make_value_bool(!val.as.boolean);
+      return vmake_value_bool(!val.as.boolean);
     } else {
       error(gen, "Expected boolean for logical not.");
     }
   } else if (match(gen, TOKEN_MINUS)) {
-    vaq_make_value val = unary(gen);
+    vmake_value val = unary(gen);
     if (val.type == VAL_NUMBER) {
-      return vaq_make_value_number(-val.as.number);
+      return vmake_value_number(-val.as.number);
     } else {
       error(gen, "Expected number for unary minus.");
     }
@@ -307,17 +307,17 @@ vaq_make_value unary(vaq_make_gen *gen) {
   return call(gen);
 }
 
-vaq_make_value call(vaq_make_gen *gen) {
-  vaq_make_value val = primary(gen);
+vmake_value call(vmake_gen *gen) {
+  vmake_value val = primary(gen);
 
   // TODO: Implement this for functions and property access
   //
   while (true) {
     if (match(gen, TOKEN_LEFT_PAREN)) {
-      vaq_make_value_array args = arguments(gen);
+      vmake_value_array args = arguments(gen);
       consume_expected(gen, TOKEN_RIGHT_PAREN, "Expected ')' after argument list");
       val = call_value(gen, val, args);
-      vaq_make_value_array_free(&args);
+      vmake_value_array_free(&args);
     }
     // else if (match(gen, TOKEN_DOT)) {
     // }
@@ -326,13 +326,13 @@ vaq_make_value call(vaq_make_gen *gen) {
   return val;
 }
 
-vaq_make_value primary(vaq_make_gen *gen) {
+vmake_value primary(vmake_gen *gen) {
   if (match(gen, TOKEN_FALSE)) {
-    return vaq_make_value_bool(false);
+    return vmake_value_bool(false);
   } else if (match(gen, TOKEN_TRUE)) {
-    return vaq_make_value_bool(true);
+    return vmake_value_bool(true);
   } else if (match(gen, TOKEN_NULL)) {
-    return vaq_make_value_nil();
+    return vmake_value_nil();
   } else if (match(gen, TOKEN_NUMBER)) {
     return number(gen);
   } else if (match(gen, TOKEN_STRING)) {
@@ -344,56 +344,56 @@ vaq_make_value primary(vaq_make_gen *gen) {
   }
 
   error(gen, "Expected expression.");
-  return vaq_make_value_nil();
+  return vmake_value_nil();
 }
 
-vaq_make_value_array arguments(vaq_make_gen *gen) {
-  vaq_make_value_array arr;
-  vaq_make_value_array_new(&arr);
+vmake_value_array arguments(vmake_gen *gen) {
+  vmake_value_array arr;
+  vmake_value_array_new(&arr);
   do {
-    vaq_make_value_array_push(&arr, assigment(gen));
+    vmake_value_array_push(&arr, assigment(gen));
   } while (match(gen, TOKEN_COMMA));
   return arr;
 }
 
-vaq_make_value grouping(vaq_make_gen *gen) {
-  vaq_make_value val = expression(gen);
+vmake_value grouping(vmake_gen *gen) {
+  vmake_value val = expression(gen);
   consume_expected(gen, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
   return val;
 }
 
-vaq_make_value number(vaq_make_gen *gen) { return vaq_make_value_number(atof(previous(gen).name)); }
+vmake_value number(vmake_gen *gen) { return vmake_value_number(atof(previous(gen).name)); }
 
-vaq_make_value string(vaq_make_gen *gen) {
+vmake_value string(vmake_gen *gen) {
   // TODO: Implement
-  vaq_make_token token = previous(gen);
-  vaq_make_obj_string *obj = vaq_make_obj_string_new((char *)token.name, token.name_length, true);
-  return vaq_make_value_obj((vaq_make_obj *)obj);
+  vmake_token token = previous(gen);
+  vmake_obj_string *obj = vmake_obj_string_new((char *)token.name, token.name_length, true);
+  return vmake_value_obj((vmake_obj *)obj);
 }
 
-vaq_make_value identifier(vaq_make_gen *gen) {
-  vaq_make_value *res = resolve_variable(gen, previous(gen));
+vmake_value identifier(vmake_gen *gen) {
+  vmake_value *res = resolve_variable(gen, previous(gen));
   if (res)
     return *res;
-  return vaq_make_value_nil();
+  return vmake_value_nil();
 }
 
-vaq_make_value assign_variable(vaq_make_gen *gen, vaq_make_value *lhs, vaq_make_value rhs) {
+vmake_value assign_variable(vmake_gen *gen, vmake_value *lhs, vmake_value rhs) {
   // lhs->type = rhs.type;
   // lhs->as = rhs.as;
   *lhs = rhs;
   return *lhs;
 }
 
-vaq_make_value call_value(vaq_make_gen *gen, vaq_make_value val, vaq_make_value_array args) {
+vmake_value call_value(vmake_gen *gen, vmake_value val, vmake_value_array args) {
   error(gen, "Operation is not yet implemented.");
-  return vaq_make_value_nil();
+  return vmake_value_nil();
 }
 
-vaq_make_value *resolve_variable(vaq_make_gen *gen, vaq_make_token name) {
+vmake_value *resolve_variable(vmake_gen *gen, vmake_token name) {
   // If variable exists, return it
   for (int i = 0; i < gen->variables.size; i++) {
-    vaq_make_variable *variable = &gen->variables.values[i];
+    vmake_variable *variable = &gen->variables.values[i];
     if (variable->name.name_length == name.name_length &&
         strncmp(variable->name.name, name.name, name.name_length) == 0) {
       return &variable->value;
@@ -401,13 +401,13 @@ vaq_make_value *resolve_variable(vaq_make_gen *gen, vaq_make_token name) {
   }
 
   // If variable doesn't exist, create it
-  vaq_make_variable variable;
+  vmake_variable variable;
   variable.name = name;
-  variable.value = vaq_make_value_nil();
-  vaq_make_variable_array_push(&gen->variables, variable);
+  variable.value = vmake_value_nil();
+  vmake_variable_array_push(&gen->variables, variable);
 
   // Return the copy of our variable from the heap.
-  vaq_make_value *ptr = &gen->variables.values[gen->variables.size - 1].value;
+  vmake_value *ptr = &gen->variables.values[gen->variables.size - 1].value;
   // Push the pointer onto the stack.
   gen->stack[gen->stack_size++] = ptr;
 

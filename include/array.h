@@ -3,26 +3,26 @@
 #include "value.h"
 #include <stddef.h>
 
-typedef struct vaq_make_variable vaq_make_variable;
+typedef struct vmake_variable vmake_variable;
 
-typedef struct vaq_make_value_array {
-  vaq_make_value *values;
+typedef struct vmake_value_array {
+  vmake_value *values;
   int size;
   int capacity;
-} vaq_make_value_array;
+} vmake_value_array;
 
-typedef struct vaq_make_variable_array {
-  vaq_make_variable *values;
+typedef struct vmake_variable_array {
+  vmake_variable *values;
   int size;
   int capacity;
-} vaq_make_variable_array;
+} vmake_variable_array;
 
-void vaq_make_value_array_new(vaq_make_value_array *arr);
-void vaq_make_value_array_free(vaq_make_value_array *arr);
-void vaq_make_value_array_push(vaq_make_value_array *arr, vaq_make_value val);
-vaq_make_value vaq_make_value_array_pop(vaq_make_value_array *arr);
+void vmake_value_array_new(vmake_value_array *arr);
+void vmake_value_array_free(vmake_value_array *arr);
+void vmake_value_array_push(vmake_value_array *arr, vmake_value val);
+vmake_value vmake_value_array_pop(vmake_value_array *arr);
 
-void vaq_make_variable_array_new(vaq_make_variable_array *arr);
-void vaq_make_variable_array_free(vaq_make_variable_array *arr);
-void vaq_make_variable_array_push(vaq_make_variable_array *arr, vaq_make_variable val);
-vaq_make_variable vaq_make_variable_array_pop(vaq_make_variable_array *arr);
+void vmake_variable_array_new(vmake_variable_array *arr);
+void vmake_variable_array_free(vmake_variable_array *arr);
+void vmake_variable_array_push(vmake_variable_array *arr, vmake_variable val);
+vmake_variable vmake_variable_array_pop(vmake_variable_array *arr);

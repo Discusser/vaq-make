@@ -5,26 +5,26 @@
 #include "scanner.h"
 #include <stdbool.h>
 
-void declaration(vaq_make_gen *gen);
-void statement(vaq_make_gen *gen);
-void print_statement(vaq_make_gen *gen);
-void include_statement(vaq_make_gen *gen);
-void expression_statement(vaq_make_gen *gen);
-vaq_make_value expression(vaq_make_gen *gen);
-vaq_make_value assigment(vaq_make_gen *gen);
-vaq_make_value equality(vaq_make_gen *gen);
-vaq_make_value comparison(vaq_make_gen *gen);
-vaq_make_value term(vaq_make_gen *gen);
-vaq_make_value factor(vaq_make_gen *gen);
-vaq_make_value unary(vaq_make_gen *gen);
-vaq_make_value call(vaq_make_gen *gen);
-vaq_make_value primary(vaq_make_gen *gen);
-vaq_make_value_array arguments(vaq_make_gen *gen);
-vaq_make_value grouping(vaq_make_gen *gen);
-vaq_make_value number(vaq_make_gen *gen);
-vaq_make_value string(vaq_make_gen *gen);
-vaq_make_value identifier(vaq_make_gen *gen);
+void declaration(vmake_gen *gen);
+void statement(vmake_gen *gen);
+void print_statement(vmake_gen *gen);
+void include_statement(vmake_gen *gen);
+void expression_statement(vmake_gen *gen);
+vmake_value expression(vmake_gen *gen);
+vmake_value assigment(vmake_gen *gen);
+vmake_value equality(vmake_gen *gen);
+vmake_value comparison(vmake_gen *gen);
+vmake_value term(vmake_gen *gen);
+vmake_value factor(vmake_gen *gen);
+vmake_value unary(vmake_gen *gen);
+vmake_value call(vmake_gen *gen);
+vmake_value primary(vmake_gen *gen);
+vmake_value_array arguments(vmake_gen *gen);
+vmake_value grouping(vmake_gen *gen);
+vmake_value number(vmake_gen *gen);
+vmake_value string(vmake_gen *gen);
+vmake_value identifier(vmake_gen *gen);
 
-vaq_make_value assign_variable(vaq_make_gen *gen, vaq_make_value *lhs, vaq_make_value rhs);
-vaq_make_value call_value(vaq_make_gen *gen, vaq_make_value val, vaq_make_value_array args);
-vaq_make_value *resolve_variable(vaq_make_gen *gen, vaq_make_token name);
+vmake_value assign_variable(vmake_gen *gen, vmake_value *lhs, vmake_value rhs);
+vmake_value call_value(vmake_gen *gen, vmake_value val, vmake_value_array args);
+vmake_value *resolve_variable(vmake_gen *gen, vmake_token name);

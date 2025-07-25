@@ -3,21 +3,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-vaq_make_value vaq_make_value_number(double number) {
-  return (vaq_make_value){VAL_NUMBER, {.number = number}};
+vmake_value vmake_value_number(double number) {
+  return (vmake_value){VAL_NUMBER, {.number = number}};
 }
 
-vaq_make_value vaq_make_value_bool(bool boolean) {
-  return (vaq_make_value){VAL_BOOL, {.boolean = boolean}};
-}
+vmake_value vmake_value_bool(bool boolean) { return (vmake_value){VAL_BOOL, {.boolean = boolean}}; }
 
-vaq_make_value vaq_make_value_nil() { return (vaq_make_value){VAL_NIL, {.number = 0}}; }
+vmake_value vmake_value_nil() { return (vmake_value){VAL_NIL, {.number = 0}}; }
 
-vaq_make_value vaq_make_value_obj(vaq_make_obj *obj) {
-  return (vaq_make_value){VAL_OBJ, {.obj = obj}};
-}
+vmake_value vmake_value_obj(vmake_obj *obj) { return (vmake_value){VAL_OBJ, {.obj = obj}}; }
 
-char *vaq_make_value_to_string(vaq_make_value val) {
+char *vmake_value_to_string(vmake_value val) {
   char *buf;
   switch (val.type) {
   case VAL_NUMBER: {
@@ -51,19 +47,19 @@ char *vaq_make_value_to_string(vaq_make_value val) {
     strcpy(buf, "null");
     break;
   case VAL_OBJ:
-    buf = vaq_make_obj_to_string(val.as.obj);
+    buf = vmake_obj_to_string(val.as.obj);
   }
 
   return buf;
 }
 
-void vaq_make_value_print(vaq_make_value val) {
-  char *buf = vaq_make_value_to_string(val);
+void vmake_value_print(vmake_value val) {
+  char *buf = vmake_value_to_string(val);
   printf("%s", buf);
   free(buf);
 }
 
-bool vaq_make_value_equals(vaq_make_value a, vaq_make_value b) {
+bool vmake_value_equals(vmake_value a, vmake_value b) {
   if (a.type != b.type)
     return false;
 
@@ -80,7 +76,7 @@ bool vaq_make_value_equals(vaq_make_value a, vaq_make_value b) {
   }
 }
 
-int vaq_make_value_compare(vaq_make_value a, vaq_make_value b) {
+int vmake_value_compare(vmake_value a, vmake_value b) {
   switch (a.type) {
   case VAL_NUMBER: {
     double x = a.as.number;

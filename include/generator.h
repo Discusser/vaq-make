@@ -5,21 +5,21 @@
 #include "value.h"
 #include <stdbool.h>
 
-typedef struct vaq_make_variable {
-  vaq_make_value value;
-  vaq_make_token name;
-} vaq_make_variable;
+typedef struct vmake_variable {
+  vmake_value value;
+  vmake_token name;
+} vmake_variable;
 
-typedef struct vaq_make_gen {
+typedef struct vmake_gen {
   const char *file_name;
-  vaq_make_scanner *scanner;
-  vaq_make_variable_array variables;
-  vaq_make_value *stack[256];
-  vaq_make_token previous;
-  vaq_make_token current;
+  vmake_scanner *scanner;
+  vmake_variable_array variables;
+  vmake_value *stack[256];
+  vmake_token previous;
+  vmake_token current;
   int stack_size;
   bool had_error;
   bool panic_mode;
-} vaq_make_gen;
+} vmake_gen;
 
-bool vaq_make_generate_build(vaq_make_scanner *scanner, const char *file_path);
+bool vmake_generate_build(vmake_scanner *scanner, const char *file_path);

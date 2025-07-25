@@ -11,8 +11,8 @@ int main(int argc, char *argv[]) {
   }
 
   char *source = read_file(argv[1], NULL);
-  vaq_make_scanner scanner = vaq_make_init_scanner(source);
-  vaq_make_generate_build(&scanner, argv[1]);
+  vmake_scanner scanner = vmake_init_scanner(source);
+  vmake_generate_build(&scanner, argv[1]);
   free(source);
 
   return 0;

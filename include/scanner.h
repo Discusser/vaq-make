@@ -1,6 +1,6 @@
 #pragma once
 
-typedef enum vaq_make_token_type {
+typedef enum vmake_token_type {
   TOKEN_EOF,
   TOKEN_ERROR,
   TOKEN_SEMICOLON,
@@ -28,24 +28,24 @@ typedef enum vaq_make_token_type {
   TOKEN_TRUE,
   TOKEN_NULL,
   TOKEN_INCLUDE,
-} vaq_make_token_type;
+} vmake_token_type;
 
-typedef struct vaq_make_token {
+typedef struct vmake_token {
   // This pointer is not null-terminated
   const char *name;
   int name_length;
   int line;
-  vaq_make_token_type type;
-} vaq_make_token;
+  vmake_token_type type;
+} vmake_token;
 
-typedef struct vaq_make_scanner {
+typedef struct vmake_scanner {
   // A pointer to the start of the current token
   const char *token_start;
   // A pointer to the current character we're reading
   const char *current_char;
   // The line we're currently on
   int line;
-} vaq_make_scanner;
+} vmake_scanner;
 
-vaq_make_scanner vaq_make_init_scanner(const char *source);
-vaq_make_token vaq_make_scan_token(vaq_make_scanner *scanner);
+vmake_scanner vmake_init_scanner(const char *source);
+vmake_token vmake_scan_token(vmake_scanner *scanner);

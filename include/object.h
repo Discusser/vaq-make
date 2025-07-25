@@ -4,37 +4,37 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef enum vaq_make_obj_type {
+typedef enum vmake_obj_type {
   OBJ_STRING,
   OBJ_NATIVE,
-} vaq_make_obj_type;
+} vmake_obj_type;
 
-typedef struct vaq_make_obj {
-  vaq_make_obj_type type;
-} vaq_make_obj;
+typedef struct vmake_obj {
+  vmake_obj_type type;
+} vmake_obj;
 
-typedef struct vaq_make_obj_string {
-  vaq_make_obj obj;
+typedef struct vmake_obj_string {
+  vmake_obj obj;
   int length;
   char *chars;
-} vaq_make_obj_string;
+} vmake_obj_string;
 
-typedef struct vaq_make_value vaq_make_value;
+typedef struct vmake_value vmake_value;
 
-typedef vaq_make_value (*vaq_make_native_fn)(int argc, vaq_make_value *argv);
+typedef vmake_value (*vmake_native_fn)(int argc, vmake_value *argv);
 
-typedef struct vaq_make_obj_native {
-  vaq_make_obj obj;
-  vaq_make_native_fn function;
-} vaq_make_obj_native;
+typedef struct vmake_obj_native {
+  vmake_obj obj;
+  vmake_native_fn function;
+} vmake_obj_native;
 
-vaq_make_obj *vaq_make_obj_new(size_t size, vaq_make_obj_type type);
-char *vaq_make_obj_to_string(vaq_make_obj *obj);
-void vaq_make_obj_print(vaq_make_obj *obj);
-void vaq_make_obj_free(vaq_make_obj *obj);
+vmake_obj *vmake_obj_new(size_t size, vmake_obj_type type);
+char *vmake_obj_to_string(vmake_obj *obj);
+void vmake_obj_print(vmake_obj *obj);
+void vmake_obj_free(vmake_obj *obj);
 
-vaq_make_obj_string *vaq_make_obj_string_new(char *chars, int length, bool copy);
-void vaq_make_obj_string_free(vaq_make_obj_string *obj);
+vmake_obj_string *vmake_obj_string_new(char *chars, int length, bool copy);
+void vmake_obj_string_free(vmake_obj_string *obj);
 
-vaq_make_obj_native *vaq_make_obj_native_new(vaq_make_native_fn function);
-void vaq_make_obj_native_free(vaq_make_obj_native *obj);
+vmake_obj_native *vmake_obj_native_new(vmake_native_fn function);
+void vmake_obj_native_free(vmake_obj_native *obj);

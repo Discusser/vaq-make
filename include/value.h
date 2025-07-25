@@ -3,25 +3,25 @@
 #include "object.h"
 #include <stdbool.h>
 
-typedef enum vaq_make_value_type { VAL_NUMBER, VAL_BOOL, VAL_NIL, VAL_OBJ } vaq_make_value_type;
+typedef enum vmake_value_type { VAL_NUMBER, VAL_BOOL, VAL_NIL, VAL_OBJ } vmake_value_type;
 
-typedef struct vaq_make_obj vaq_make_obj;
+typedef struct vmake_obj vmake_obj;
 
-typedef struct vaq_make_value {
-  vaq_make_value_type type;
+typedef struct vmake_value {
+  vmake_value_type type;
   union {
     double number;
     bool boolean;
-    vaq_make_obj *obj;
+    vmake_obj *obj;
   } as;
-} vaq_make_value;
+} vmake_value;
 
-vaq_make_value vaq_make_value_number(double number);
-vaq_make_value vaq_make_value_bool(bool boolean);
-vaq_make_value vaq_make_value_nil();
-vaq_make_value vaq_make_value_obj(vaq_make_obj *obj);
+vmake_value vmake_value_number(double number);
+vmake_value vmake_value_bool(bool boolean);
+vmake_value vmake_value_nil();
+vmake_value vmake_value_obj(vmake_obj *obj);
 
-char *vaq_make_value_to_string(vaq_make_value val);
-void vaq_make_value_print(vaq_make_value val);
-bool vaq_make_value_equals(vaq_make_value a, vaq_make_value b);
-int vaq_make_value_compare(vaq_make_value a, vaq_make_value b);
+char *vmake_value_to_string(vmake_value val);
+void vmake_value_print(vmake_value val);
+bool vmake_value_equals(vmake_value a, vmake_value b);
+int vmake_value_compare(vmake_value a, vmake_value b);

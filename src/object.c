@@ -3,18 +3,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define OBJ_NEW(struct_t, type) (struct_t *)vaq_make_obj_new(sizeof(struct_t), type)
+#define OBJ_NEW(struct_t, type) (struct_t *)vmake_obj_new(sizeof(struct_t), type)
 
-vaq_make_obj *vaq_make_obj_new(size_t size, vaq_make_obj_type type) {
-  vaq_make_obj *obj = malloc(size);
+vmake_obj *vmake_obj_new(size_t size, vmake_obj_type type) {
+  vmake_obj *obj = malloc(size);
   obj->type = type;
   return obj;
 }
 
-char *vaq_make_obj_to_string(vaq_make_obj *obj) {
+char *vmake_obj_to_string(vmake_obj *obj) {
   switch (obj->type) {
   case OBJ_STRING: {
-    vaq_make_obj_string *str = (vaq_make_obj_string *)obj;
+    vmake_obj_string *str = (vmake_obj_string *)obj;
     char *buf = malloc(str->length + 1);
     memcpy(buf, str->chars, str->length);
     buf[str->length] = '\0';
@@ -30,16 +30,16 @@ char *vaq_make_obj_to_string(vaq_make_obj *obj) {
   return NULL;
 }
 
-void vaq_make_obj_print(vaq_make_obj *obj) {
-  char *buf = vaq_make_obj_to_string(obj);
+void vmake_obj_print(vmake_obj *obj) {
+  char *buf = vmake_obj_to_string(obj);
   printf("%s", buf);
   free(buf);
 }
 
-void vaq_make_obj_free(vaq_make_obj *obj) { free(obj); }
+void vmake_obj_free(vmake_obj *obj) { free(obj); }
 
-vaq_make_obj_string *vaq_make_obj_string_new(char *chars, int length, bool copy) {
-  vaq_make_obj_string *obj = OBJ_NEW(vaq_make_obj_string, OBJ_STRING);
+vmake_obj_string *vmake_obj_string_new(char *chars, int length, bool copy) {
+  vmake_obj_string *obj = OBJ_NEW(vmake_obj_string, OBJ_STRING);
 
   if (copy) {
     obj->chars = malloc(length + 1);
@@ -53,15 +53,15 @@ vaq_make_obj_string *vaq_make_obj_string_new(char *chars, int length, bool copy)
   return obj;
 }
 
-void vaq_make_obj_string_free(vaq_make_obj_string *obj) {
+void vmake_obj_string_free(vmake_obj_string *obj) {
   free(obj->chars);
   free(obj);
 }
 
-vaq_make_obj_native *vaq_make_obj_native_new(vaq_make_native_fn function) {
-  vaq_make_obj_native *obj = OBJ_NEW(vaq_make_obj_native, OBJ_NATIVE);
+vmake_obj_native *vmake_obj_native_new(vmake_native_fn function) {
+  vmake_obj_native *obj = OBJ_NEW(vmake_obj_native, OBJ_NATIVE);
   obj->function = function;
   return obj;
 }
 
-void vaq_make_obj_native_free(vaq_make_obj_native *obj) { free(obj); }
+void vmake_obj_native_free(vmake_obj_native *obj) { free(obj); }

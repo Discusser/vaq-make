@@ -2,50 +2,48 @@
 #include "generator.h"
 #include <stdlib.h>
 
-void vaq_make_value_array_new(vaq_make_value_array *arr) {
+void vmake_value_array_new(vmake_value_array *arr) {
   arr->values = NULL;
   arr->capacity = 0;
   arr->size = 0;
 }
 
-void vaq_make_value_array_free(vaq_make_value_array *arr) {
+void vmake_value_array_free(vmake_value_array *arr) {
   free(arr->values);
-  vaq_make_value_array_new(arr);
+  vmake_value_array_new(arr);
 }
 
-void vaq_make_value_array_push(vaq_make_value_array *arr, vaq_make_value val) {
+void vmake_value_array_push(vmake_value_array *arr, vmake_value val) {
   if (arr->size + 1 > arr->capacity) {
     arr->capacity = arr->capacity < 8 ? 8 : arr->capacity * 2;
-    arr->values = reallocarray(arr->values, arr->capacity, sizeof(vaq_make_value));
+    arr->values = reallocarray(arr->values, arr->capacity, sizeof(vmake_value));
   }
 
   arr->values[arr->size++] = val;
 }
 
-vaq_make_value vaq_make_value_array_pop(vaq_make_value_array *arr) {
-  return arr->values[--arr->size];
-}
+vmake_value vmake_value_array_pop(vmake_value_array *arr) { return arr->values[--arr->size]; }
 
-void vaq_make_variable_array_new(vaq_make_variable_array *arr) {
+void vmake_variable_array_new(vmake_variable_array *arr) {
   arr->values = NULL;
   arr->capacity = 0;
   arr->size = 0;
 }
 
-void vaq_make_variable_array_free(vaq_make_variable_array *arr) {
+void vmake_variable_array_free(vmake_variable_array *arr) {
   free(arr->values);
-  vaq_make_variable_array_new(arr);
+  vmake_variable_array_new(arr);
 }
 
-void vaq_make_variable_array_push(vaq_make_variable_array *arr, vaq_make_variable val) {
+void vmake_variable_array_push(vmake_variable_array *arr, vmake_variable val) {
   if (arr->size + 1 > arr->capacity) {
     arr->capacity = arr->capacity < 8 ? 8 : arr->capacity * 2;
-    arr->values = reallocarray(arr->values, arr->capacity, sizeof(vaq_make_variable));
+    arr->values = reallocarray(arr->values, arr->capacity, sizeof(vmake_variable));
   }
 
   arr->values[arr->size++] = val;
 }
 
-vaq_make_variable vaq_make_variable_array_pop(vaq_make_variable_array *arr) {
+vmake_variable vmake_variable_array_pop(vmake_variable_array *arr) {
   return arr->values[--arr->size];
 }

@@ -5,11 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void consume_ignored(vaq_make_scanner *scanner);
-static char consume(vaq_make_scanner *scanner);
-static char peek(vaq_make_scanner *scanner);
-static bool is_eof(vaq_make_scanner *scanner);
-static bool match(vaq_make_scanner *scanner, char c);
+static void consume_ignored(vmake_scanner *scanner);
+static char consume(vmake_scanner *scanner);
+static char peek(vmake_scanner *scanner);
+static bool is_eof(vmake_scanner *scanner);
+static bool match(vmake_scanner *scanner, char c);
 
 char *read_file(const char *path, size_t *file_size) {
   FILE *file = fopen(path, "r");
@@ -37,8 +37,8 @@ char *read_file(const char *path, size_t *file_size) {
   return source;
 }
 
-vaq_make_scanner vaq_make_init_scanner(const char *source) {
-  vaq_make_scanner scanner;
+vmake_scanner vmake_init_scanner(const char *source) {
+  vmake_scanner scanner;
 
   scanner.current_char = source;
   scanner.token_start = source;
@@ -47,7 +47,7 @@ vaq_make_scanner vaq_make_init_scanner(const char *source) {
   return scanner;
 }
 
-vaq_make_token vaq_make_scan_token(vaq_make_scanner *scanner) {
+vmake_token vmake_scan_token(vmake_scanner *scanner) {
   consume_ignored(scanner);
 
   scanner->token_start = scanner->current_char;
@@ -100,7 +100,7 @@ vaq_make_token vaq_make_scan_token(vaq_make_scanner *scanner) {
   return make_token(scanner, TOKEN_ERROR);
 }
 
-static void consume_ignored(vaq_make_scanner *scanner) {
+static void consume_ignored(vmake_scanner *scanner) {
   while (true) {
     char c = peek(scanner);
     switch (c) {
@@ -123,13 +123,13 @@ static void consume_ignored(vaq_make_scanner *scanner) {
   }
 }
 
-static char consume(vaq_make_scanner *scanner) { return *scanner->current_char++; }
+static char consume(vmake_scanner *scanner) { return *scanner->current_char++; }
 
-static char peek(vaq_make_scanner *scanner) { return *scanner->current_char; }
+static char peek(vmake_scanner *scanner) { return *scanner->current_char; }
 
-static bool is_eof(vaq_make_scanner *scanner) { return peek(scanner) == '\0'; }
+static bool is_eof(vmake_scanner *scanner) { return peek(scanner) == '\0'; }
 
-static bool match(vaq_make_scanner *scanner, char c) {
+static bool match(vmake_scanner *scanner, char c) {
   if (peek(scanner) == c) {
     scanner->current_char++;
     return true;
@@ -142,7 +142,7 @@ bool is_identifier_char(char c, bool first) {
   return c == '_' || (first ? isalpha(c) : isalnum(c));
 }
 
-vaq_make_token make_number(vaq_make_scanner *scanner) {
+vmake_token make_number(vmake_scanner *scanner) {
   while (isdigit(peek(scanner))) {
     consume(scanner);
   }
@@ -150,7 +150,7 @@ vaq_make_token make_number(vaq_make_scanner *scanner) {
   return make_token(scanner, TOKEN_NUMBER);
 }
 
-vaq_make_token make_identifier(vaq_make_scanner *scanner) {
+vmake_token make_identifier(vmake_scanner *scanner) {
   while (is_identifier_char(peek(scanner), false)) {
     consume(scanner);
   }
@@ -158,7 +158,7 @@ vaq_make_token make_identifier(vaq_make_scanner *scanner) {
   return make_token(scanner, identifier_type(scanner));
 }
 
-vaq_make_token make_string(vaq_make_scanner *scanner) {
+vmake_token make_string(vmake_scanner *scanner) {
   char c;
   do {
     c = consume(scanner);
@@ -166,13 +166,13 @@ vaq_make_token make_string(vaq_make_scanner *scanner) {
 
   // Get rid of the " at the beginning.
   scanner->token_start++;
-  vaq_make_token token = make_token(scanner, TOKEN_STRING);
+  vmake_token token = make_token(scanner, TOKEN_STRING);
   // Get rid of the " at the end.
   token.name_length--;
   return token;
 }
 
-vaq_make_token_type identifier_type(vaq_make_scanner *scanner) {
+vmake_token_type identifier_type(vmake_scanner *scanner) {
   switch (*scanner->token_start) {
   case 'f':
     return check_keyword(scanner, 1, 4, "alse", TOKEN_FALSE);
@@ -189,8 +189,8 @@ vaq_make_token_type identifier_type(vaq_make_scanner *scanner) {
   return TOKEN_IDENTIFIER;
 }
 
-vaq_make_token_type check_keyword(vaq_make_scanner *scanner, int start, int length,
-                                  const char *rest, vaq_make_token_type type) {
+vmake_token_type check_keyword(vmake_scanner *scanner, int start, int length, const char *rest,
+                               vmake_token_type type) {
   if (scanner->current_char - scanner->token_start == start + length &&
       memcmp(scanner->token_start + start, rest, length) == 0) {
     return type;
@@ -199,8 +199,8 @@ vaq_make_token_type check_keyword(vaq_make_scanner *scanner, int start, int leng
   return TOKEN_IDENTIFIER;
 }
 
-vaq_make_token make_token(vaq_make_scanner *scanner, vaq_make_token_type type) {
-  vaq_make_token token;
+vmake_token make_token(vmake_scanner *scanner, vmake_token_type type) {
+  vmake_token token;
   token.type = type;
   token.line = scanner->line;
   token.name = scanner->token_start;
