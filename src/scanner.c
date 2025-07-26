@@ -187,7 +187,7 @@ vmake_token_type identifier_type(vmake_scanner *scanner) {
   case 'i':
     return check_keyword(scanner, 1, 6, "nclude", TOKEN_INCLUDE);
   case 'n':
-    return check_keyword(scanner, 1, 3, "ull", TOKEN_NULL);
+    return check_keyword(scanner, 1, 2, "il", TOKEN_NIL);
   case 'p':
     return check_keyword(scanner, 1, 4, "rint", TOKEN_PRINT);
   case 't':

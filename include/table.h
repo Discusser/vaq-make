@@ -28,6 +28,8 @@ void vmake_table_copy_to(vmake_table *from, vmake_table *to);
 // table if necessary. `key` should not be NULL. Returns true if the key didn't
 // exist previously in the table, or false if it did, that is, the return value
 // indicates if this key is a new key.
+bool vmake_table_put_cpy_ret(vmake_table *table, vmake_value key, vmake_value value,
+                             vmake_value **inserted);
 bool vmake_table_put_cpy(vmake_table *table, vmake_value key, vmake_value value);
 bool vmake_table_put_ptr(vmake_table *table, vmake_value key, vmake_value *value);
 bool vmake_table_put_ret(vmake_table *table, vmake_value key, vmake_value *value,
@@ -40,6 +42,9 @@ bool vmake_table_remove(vmake_table *table, vmake_value key);
 // or false if it doesn't, in which case `value` is unmodified. If `value` is
 // NULL, it is also unmodified.
 bool vmake_table_get(vmake_table *table, vmake_value key, vmake_value **value);
+// Same as vmake_table_get, but makes value point to a vmake_value with type VAL_NIL if the key is
+// not present.
+bool vmake_table_get_or_nil(vmake_table *table, vmake_value key, vmake_value **value);
 // Returns true if the key exists in the table, or false if it doesn't. This is
 // equivalent to vmake_table_get(table, key, NULL)
 bool vmake_table_has(vmake_table *table, vmake_value key);

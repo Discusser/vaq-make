@@ -7,10 +7,11 @@ set(CMAKE_BUILD_TYPE Debug)
 
 add_executable(
   vaq-make
+  src/native/class.c
+  src/native/fun.c
   src/array.c
   src/file.c
   src/generator.c
-  src/native.c
   src/object.c
   src/scanner.c
   src/table.c

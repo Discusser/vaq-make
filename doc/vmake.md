@@ -27,7 +27,7 @@ arguments = assignment ( "," assignment )* ( "," identifier "=" assignment )* ;
 grouping = "(" expression ")" ;
 number = digit_excluding_zero digit* ;
 string = """ ascii_character_excluding_zero """ ;
-literal = "true" | "false" | "null" ;
+literal = "true" | "false" | "nil" ;
 array = "[" assignment ( "," assignment )* "]"
 identifier = ( alphabetical | "_" ) ( alphanumerical | "_" )* ;
 

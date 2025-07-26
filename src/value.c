@@ -4,6 +4,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+char *vmake_value_type_to_string(vmake_value_type type) {
+  switch (type) {
+  case VAL_EMPTY:
+    return "empty";
+  case VAL_NUMBER:
+    return "number";
+  case VAL_BOOL:
+    return "bool";
+  case VAL_NIL:
+    return "nil";
+  case VAL_OBJ:
+    return "obj";
+  }
+}
+
 vmake_value vmake_value_empty() { return (vmake_value){VAL_EMPTY, {.number = 0}}; }
 
 vmake_value vmake_value_number(double number) {
@@ -28,6 +43,10 @@ bool vmake_value_is_native(vmake_value val) {
 
 bool vmake_value_is_array(vmake_value val) {
   return vmake_value_is_obj(val) && val.as.obj->type == OBJ_ARRAY;
+}
+
+bool vmake_value_is_instance(vmake_value val) {
+  return vmake_value_is_obj(val) && val.as.obj->type == OBJ_INSTANCE;
 }
 
 uint32_t vmake_value_hash(vmake_value val) {
@@ -85,8 +104,8 @@ char *vmake_value_to_string(vmake_value val) {
     strcpy(buf, val.as.boolean ? "true" : "false");
     break;
   case VAL_NIL:
-    buf = malloc(sizeof(char) * 5);
-    strcpy(buf, "null");
+    buf = malloc(sizeof(char) * 4);
+    strcpy(buf, "nil");
     break;
   case VAL_EMPTY:
     buf = malloc(sizeof(char) * 6);

@@ -1,4 +1,5 @@
 #include "object.h"
+#include "common.h"
 #include "generator.h"
 #include "table.h"
 #include <stdio.h>
@@ -6,6 +7,24 @@
 #include <string.h>
 
 #define OBJ_NEW(struct_t, type) (struct_t *)vmake_obj_new(state, sizeof(struct_t), type)
+
+char *vmake_obj_type_to_string(vmake_obj_type type) {
+  switch (type) {
+  case OBJ_STRING:
+    return "string";
+  case OBJ_NATIVE:
+    return "native";
+  case OBJ_ARRAY:
+    return "array";
+  case OBJ_CLASS:
+    return "class";
+  case OBJ_INSTANCE:
+    return "instance";
+  case OBJ_METHOD:
+    return "method";
+    break;
+  }
+}
 
 vmake_obj *vmake_obj_new(vmake_state *state, size_t size, vmake_obj_type type) {
   vmake_obj *obj = malloc(size);
@@ -32,7 +51,8 @@ char *vmake_obj_to_string(vmake_obj *obj) {
   }
   case OBJ_NATIVE: {
     char *buf;
-    asprintf(&buf, "<native '%s'>", ((vmake_obj_native *)obj)->name->chars);
+    asprintf(&buf, "<native '%s'>",
+             vmake_obj_to_string((vmake_obj *)((vmake_obj_native *)obj)->name));
     return buf;
   }
   case OBJ_ARRAY: {
@@ -55,9 +75,25 @@ char *vmake_obj_to_string(vmake_obj *obj) {
     buf[len + 1] = '\0';
     return buf;
   }
-  default: {
+  case OBJ_CLASS: {
+    char *class_name = vmake_obj_to_string((vmake_obj *)((vmake_obj_class *)obj)->name);
     char *buf;
-    asprintf(&buf, "<obj %p>", obj);
+    asprintf(&buf, "<class '%s'>", class_name);
+    free(class_name);
+    return buf;
+  }
+  case OBJ_INSTANCE: {
+    char *class_name = vmake_obj_to_string((vmake_obj *)((vmake_obj_instance *)obj)->klass->name);
+    char *buf;
+    asprintf(&buf, "<instance '%s'>", class_name);
+    free(class_name);
+    return buf;
+  }
+  case OBJ_METHOD: {
+    char *method_name = vmake_obj_to_string((vmake_obj *)((vmake_obj_method *)obj)->name);
+    char *buf;
+    asprintf(&buf, "<method '%s'>", method_name);
+    free(method_name);
     return buf;
   }
   }
@@ -70,6 +106,10 @@ void vmake_obj_print(vmake_obj *obj) {
 }
 
 void vmake_obj_free(vmake_obj *obj) { free(obj); }
+
+vmake_obj_string *vmake_obj_string_const(vmake_state *state, const char *str) {
+  return vmake_obj_string_new(state, (char *)str, strlen(str), true);
+}
 
 vmake_obj_string *vmake_obj_string_new(vmake_state *state, char *chars, int length, bool copy) {
   // Implementation of the FNV-1a algorithm. Constant values are taken from
@@ -114,16 +154,19 @@ void vmake_obj_string_free(vmake_obj_string *obj) {
   free(obj);
 }
 
-vmake_obj_native *vmake_obj_native_new(vmake_state *state, const char *name, int name_length,
-                                       vmake_native_fn function, int arity) {
+vmake_obj_native *vmake_obj_native_new(vmake_state *state, const char *name,
+                                       vmake_native_function function, int arity) {
   vmake_obj_native *obj = OBJ_NEW(vmake_obj_native, OBJ_NATIVE);
   obj->arity = arity;
-  obj->name = vmake_obj_string_new(state, (char *)name, name_length, true);
+  obj->name = vmake_obj_string_new(state, (char *)name, strlen(name), true);
   obj->function = function;
   return obj;
 }
 
-void vmake_obj_native_free(vmake_obj_native *obj) { free(obj); }
+void vmake_obj_native_free(vmake_obj_native *obj) {
+  vmake_obj_string_free(obj->name);
+  free(obj);
+}
 
 vmake_obj_array *vmake_obj_array_new(vmake_state *state, vmake_value_array array) {
   vmake_obj_array *obj = OBJ_NEW(vmake_obj_array, OBJ_ARRAY);
@@ -134,5 +177,57 @@ vmake_obj_array *vmake_obj_array_new(vmake_state *state, vmake_value_array array
 
 void vmake_obj_array_free(vmake_obj_array *obj) {
   free(obj->array);
+  free(obj);
+}
+
+vmake_obj_class *vmake_obj_class_new(vmake_state *state, const char *name) {
+  vmake_obj_class *obj = OBJ_NEW(vmake_obj_class, OBJ_CLASS);
+  obj->name = vmake_obj_string_new(state, (char *)name, strlen(name), true);
+  vmake_table_init(&obj->methods);
+  return obj;
+}
+
+void vmake_obj_class_add_method(vmake_obj_class *obj, vmake_state *state, const char *name,
+                                vmake_native_method method, int arity) {
+  vmake_value key = vmake_value_obj((vmake_obj *)vmake_obj_string_const(state, name));
+  vmake_value value =
+      vmake_value_obj((vmake_obj *)vmake_obj_method_new(state, name, method, arity));
+  vmake_table_put_cpy(&obj->methods, key, value);
+}
+
+void vmake_obj_class_free(vmake_obj_class *obj) {
+  vmake_obj_string_free(obj->name);
+  free(obj);
+}
+
+vmake_obj_instance *vmake_obj_instance_new(vmake_state *state, vmake_obj_class *klass) {
+  vmake_obj_instance *obj = OBJ_NEW(vmake_obj_instance, OBJ_INSTANCE);
+  obj->klass = klass;
+  vmake_table_init(&obj->fields);
+  return obj;
+}
+
+void vmake_obj_instance_add_field(vmake_obj_instance *obj, vmake_state *state, const char *name,
+                                  vmake_value value) {
+  vmake_value key = vmake_value_obj((vmake_obj *)vmake_obj_string_const(state, name));
+  vmake_table_put_cpy(&obj->fields, key, value);
+}
+
+void vmake_obj_instance_free(vmake_obj_instance *obj) {
+  vmake_table_free(&obj->fields);
+  free(obj);
+}
+
+vmake_obj_method *vmake_obj_method_new(vmake_state *state, const char *name,
+                                       vmake_native_method method, int arity) {
+  vmake_obj_method *obj = OBJ_NEW(vmake_obj_method, OBJ_METHOD);
+  obj->method = method;
+  obj->name = vmake_obj_string_new(state, (char *)name, strlen(name), true);
+  obj->arity = arity;
+  return obj;
+}
+
+void vmake_obj_method_free(vmake_obj_method *obj) {
+  vmake_obj_string_free(obj->name);
   free(obj);
 }

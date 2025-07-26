@@ -30,6 +30,11 @@ bool vmake_table_put_cpy(vmake_table *table, vmake_value key, vmake_value value)
   return vmake_table_put_ret(table, key, &value, NULL);
 }
 
+bool vmake_table_put_cpy_ret(vmake_table *table, vmake_value key, vmake_value value,
+                             vmake_value **inserted) {
+  return vmake_table_put_ret(table, key, &value, inserted);
+}
+
 bool vmake_table_put_ptr(vmake_table *table, vmake_value key, vmake_value *value) {
   return vmake_table_put_ret(table, key, value, NULL);
 }
@@ -88,6 +93,14 @@ bool vmake_table_get(vmake_table *table, vmake_value key, vmake_value **value) {
   if (value != NULL)
     *value = entry->value;
   return true;
+}
+
+bool vmake_table_get_or_nil(vmake_table *table, vmake_value key, vmake_value **value) {
+  bool ret = vmake_table_get(table, key, value);
+  if (value == NULL) {
+    vmake_table_put_cpy_ret(table, key, vmake_value_nil(), value);
+  }
+  return ret;
 }
 
 bool vmake_table_has(vmake_table *table, vmake_value key) {

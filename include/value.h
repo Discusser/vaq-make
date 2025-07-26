@@ -24,6 +24,8 @@ typedef struct vmake_value {
   } as;
 } vmake_value;
 
+char *vmake_value_type_to_string(vmake_value_type type);
+
 vmake_value vmake_value_empty();
 vmake_value vmake_value_number(double number);
 vmake_value vmake_value_bool(bool boolean);
@@ -34,6 +36,7 @@ bool vmake_value_is_obj(vmake_value val);
 bool vmake_value_is_string(vmake_value val);
 bool vmake_value_is_native(vmake_value val);
 bool vmake_value_is_array(vmake_value val);
+bool vmake_value_is_instance(vmake_value val);
 
 uint32_t vmake_value_hash(vmake_value val);
 
