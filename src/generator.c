@@ -32,11 +32,6 @@ bool vmake_generate_build(vmake_scanner *scanner, vmake_state *state, const char
   vmake_gen gen;
   gen.state = state;
   gen.file_path = file_path;
-
-  vmake_value path_key = vmake_value_obj(
-      (vmake_obj *)vmake_obj_string_new(gen.state, (char *)file_path, strlen(file_path), true));
-  vmake_value_array_push(&gen.state->include_stack, path_key);
-
   gen.scanner = scanner;
   gen.previous.type = TOKEN_NONE;
   gen.current.type = TOKEN_NONE;
@@ -152,7 +147,23 @@ void include_statement(vmake_gen *gen) {
     return;
   }
 
-  if (vmake_value_array_contains(&gen->state->include_stack, val)) {
+  // The include path is either absolute, or relative to the current path
+  char *include_path = ((vmake_obj_string *)val.as.obj)->chars;
+  // First we resolve the relative path
+  char *resolved_path = vmake_path_rel(gen->file_path, include_path);
+  if (resolved_path == NULL) {
+    char *str;
+    asprintf(&str, "No file with path '%s' was found", include_path);
+    error(gen, CTX_INTERNAL, str);
+    free(str);
+    return;
+  }
+
+  // Then we convert the relative path to an absolute path in order to store it in the include stack
+  char *abs_path = vmake_path_abs(resolved_path);
+  vmake_value key = vmake_value_obj((vmake_obj *)vmake_obj_string_const(gen->state, abs_path));
+  free(resolved_path);
+  if (vmake_value_array_contains(&gen->state->include_stack, key)) {
     char *val_str = vmake_value_to_string(val);
     char *str;
     asprintf(&str, "Cyclic include detected while including %s", val_str);
@@ -162,19 +173,10 @@ void include_statement(vmake_gen *gen) {
     exit(1);
   }
 
-  char *include_path = ((vmake_obj_string *)val.as.obj)->chars;
-  printf("Including %s\n", include_path);
-  char *new_path = vmake_path_rel(gen->file_path, include_path);
-  if (new_path == NULL) {
-    char *str;
-    asprintf(&str, "No file with path '%s' was found", include_path);
-    error(gen, CTX_INTERNAL, str);
-    free(str);
-    return;
-  }
+  vmake_value_array_push(&gen->state->include_stack, key);
 
-  vmake_process_path(gen->state, new_path);
-  free(new_path);
+  vmake_process_path(gen->state, abs_path);
+  free(abs_path);
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after include string.");
 }
 

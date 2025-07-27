@@ -33,6 +33,5 @@ static void define_Executable_native(vmake_state *state) {
 
 static vmake_value Executable_get_sources(vmake_obj_instance *self, vmake_gen *gen,
                                           vmake_arguments *args) {
-  printf("Hello from my method!\n");
   return *get_field_or_nil(gen, self, "sources");
 }

@@ -1,4 +1,5 @@
 #include "common.h"
+#include "file.h"
 #include "generator.h"
 #include "object.h"
 #include "scanner-priv.h"
@@ -6,26 +7,13 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     printf("Usage: %s [vmake_file]\n", argv[0]);
     exit(1);
   }
-
-  // TODO: An issue arises because of the fact that the compiler and interpreter are not separated.
-  // At the moment, when vmake_error is called, the actual VMake program might be left in an invalid
-  // state, yet it will continue running. For example, I can run the following:
-  //
-  // some_variable = "test";
-  // print(some_variable());
-  //
-  // and this will print an error saying that the object is not callable, followed by "test". The
-  // reason being that the program doesn't stop executing. The sanest option is most likely to
-  // immediately exit after any sort of error, whether it be a syntax error or a code error, which
-  // is similar to what python does.
-  //
-  // TODO: Add tests
 
   vmake_state state;
   vmake_table_init(&state.globals);
@@ -61,11 +49,12 @@ void vmake_verror(vmake_gen *gen, vmake_error_context context, vmake_token *toke
     gen->state->panic_mode = true;
   }
 
-  const char *filename;
+  char *filename;
+  bool filename_is_path = false;
   switch (context) {
   case CTX_SYNTAX:
   case CTX_USER:
-    filename = gen ? gen->file_path : "unknown";
+    filename = gen ? (filename_is_path = true, vmake_path_abs_to_rel(gen->file_path)) : "unknown";
     break;
   case CTX_NATIVE:
     filename = "native";
@@ -96,9 +85,13 @@ void vmake_verror(vmake_gen *gen, vmake_error_context context, vmake_token *toke
   vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
 
+  if (filename_is_path)
+    free(filename);
   for (int i = gen->state->include_stack.size - 2; i >= 0; i--) {
-    char *str = vmake_value_to_string(gen->state->include_stack.values[i]);
-    printf("  included from %s\n", str);
+    char *str = ((vmake_obj_string *)gen->state->include_stack.values[i].as.obj)->chars;
+    char *rel_path = vmake_path_abs_to_rel(str);
+    printf("  included from %s\n", rel_path);
+    free(rel_path);
     free(str);
   }
 
