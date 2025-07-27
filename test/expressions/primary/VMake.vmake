@@ -1,0 +1,11 @@
+a = 6;
+print(5);
+print("test");
+print(true);
+print(false);
+print(nil);
+print([1,2,3]);
+print([]);
+print("");
+print(("group"));
+print(a);

@@ -2,6 +2,10 @@
 
 #include "generator.h"
 #include "value.h"
+#include <stdio.h>
+
+#define VMAKE_STRING_BUF_INITIAL_SIZE 8
+#define VMAKE_STRING_BUF_GROW_FACTOR 2
 
 typedef enum vmake_class_type { CLASS_EXECUTABLE, CLASS_T_MAX } vmake_class_type;
 
@@ -27,6 +31,12 @@ typedef struct vmake_gen {
   int scope_depth;
 } vmake_gen;
 
+typedef struct vmake_string_buf {
+  char *string;
+  int size;
+  int capacity;
+} vmake_string_buf;
+
 typedef enum vmake_error_context {
   // For errors that come from invalid syntax written by users
   CTX_SYNTAX,
@@ -41,11 +51,18 @@ typedef enum vmake_error_context {
 
 void vmake_process_path(vmake_state *state, char *path);
 
+void vmake_verror(vmake_gen *gen, vmake_error_context context, vmake_token *token, const char *fmt,
+                  va_list ap);
 // General function for printing an error. If the error is not part of some VMake code, token can be
-// passed as NULL
+// passed as NULL. gen can also be NULL, usually when context is CTX_NATIVE or CTX_INTERNAL and the
+// function doesn't have access to a gen variable.
 void vmake_error(vmake_gen *gen, vmake_error_context context, vmake_token *token, const char *fmt,
                  ...);
 // Prints an error and then exits. This should only be called if the error will place the program in
 // a broken state, and cause a crash.
 void vmake_error_exit(vmake_gen *gen, vmake_error_context context, vmake_token *token,
                       const char *fmt, ...);
+
+void vmake_string_buf_new(vmake_string_buf *buf);
+void vmake_string_buf_append(vmake_string_buf *buf, const char *fmt, ...);
+void vmake_string_buf_free(vmake_string_buf *buf);

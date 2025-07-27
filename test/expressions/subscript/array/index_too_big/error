@@ -1,0 +1,1 @@
+ERROR at '5': Array subscript index 5 is too big for array of size 3.

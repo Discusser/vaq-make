@@ -22,3 +22,5 @@ target_include_directories(
   PUBLIC include/
   PRIVATE private/)
 target_link_libraries(vaq-make m)
+
+add_subdirectory(test)

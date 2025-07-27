@@ -53,17 +53,19 @@ void vmake_process_path(vmake_state *state, char *path) {
   free(source);
 }
 
-void vmake_error(vmake_gen *gen, vmake_error_context context, vmake_token *token, const char *fmt,
-                 ...) {
-  if (gen->state->panic_mode)
-    return;
-  gen->state->panic_mode = true;
+void vmake_verror(vmake_gen *gen, vmake_error_context context, vmake_token *token, const char *fmt,
+                  va_list ap) {
+  if (gen) {
+    if (gen->state->panic_mode)
+      return;
+    gen->state->panic_mode = true;
+  }
 
   const char *filename;
   switch (context) {
   case CTX_SYNTAX:
   case CTX_USER:
-    filename = gen->file_path;
+    filename = gen ? gen->file_path : "unknown";
     break;
   case CTX_NATIVE:
     filename = "native";
@@ -91,27 +93,68 @@ void vmake_error(vmake_gen *gen, vmake_error_context context, vmake_token *token
   } else {
     fprintf(stderr, "] ERROR: ");
   }
-  va_list va;
-  va_start(va, fmt);
-  vfprintf(stderr, fmt, va);
-  va_end(va);
+  vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
 
   for (int i = gen->state->include_stack.size - 2; i >= 0; i--) {
     char *str = vmake_value_to_string(gen->state->include_stack.values[i]);
-    printf("  included from '%s'\n", str);
+    printf("  included from %s\n", str);
     free(str);
   }
 
   gen->state->had_error = true;
 }
 
+void vmake_error(vmake_gen *gen, vmake_error_context context, vmake_token *token, const char *fmt,
+                 ...) {
+  va_list va;
+  va_start(va, fmt);
+  vmake_verror(gen, context, token, fmt, va);
+  va_end(va);
+}
+
 void vmake_error_exit(vmake_gen *gen, vmake_error_context context, vmake_token *token,
                       const char *fmt, ...) {
   va_list va;
   va_start(va, fmt);
-  vmake_error(gen, context, token, fmt, va);
+  vmake_verror(gen, context, token, fmt, va);
   va_end(va);
 
   exit(1);
 }
+
+void vmake_string_buf_new(vmake_string_buf *buf) {
+  buf->string = malloc(sizeof(char) * VMAKE_STRING_BUF_INITIAL_SIZE);
+  buf->string[0] = '\0';
+  buf->size = 0;
+  buf->capacity = VMAKE_STRING_BUF_INITIAL_SIZE;
+}
+
+void vmake_string_buf_append(vmake_string_buf *buf, const char *fmt, ...) {
+  va_list ap;
+
+  // Get the required size to print the text
+  va_start(ap, fmt);
+  int n = vsnprintf(NULL, 0, fmt, ap);
+  va_end(ap);
+
+  if (n < 0)
+    fprintf(stderr, "An error occurred while trying to append to a string buffer.");
+
+  if (n >= buf->capacity) {
+    buf->capacity *= 2;
+    if (n >= buf->capacity) {
+      buf->capacity = n + 1; // + 1 for null terminating byte
+    }
+
+    buf->string = realloc(buf->string, buf->capacity);
+  }
+
+  // Now that we've potentially grown our buffer, we can safely print to the buffer.
+  va_start(ap, fmt);
+  vsnprintf(buf->string + buf->size, n + 1, fmt, ap);
+  buf->size += n;
+  va_end(ap);
+}
+
+void vmake_string_buf_free(vmake_string_buf *buf) { free(buf->string); }

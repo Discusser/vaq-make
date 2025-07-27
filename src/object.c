@@ -22,8 +22,11 @@ char *vmake_obj_type_to_string(vmake_obj_type type) {
     return "instance";
   case OBJ_METHOD:
     return "method";
-    break;
+  case OBJ_TABLE:
+    return "table";
   }
+
+  return "obj unknown";
 }
 
 vmake_obj *vmake_obj_new(vmake_state *state, size_t size, vmake_obj_type type) {
@@ -44,56 +47,81 @@ char *vmake_obj_to_string(vmake_obj *obj) {
   switch (obj->type) {
   case OBJ_STRING: {
     vmake_obj_string *str = (vmake_obj_string *)obj;
-    char *buf = malloc(str->length + 1);
-    memcpy(buf, str->chars, str->length);
-    buf[str->length] = '\0';
-    return buf;
+    vmake_string_buf buf;
+    vmake_string_buf_new(&buf);
+    vmake_string_buf_append(&buf, "\"%.*s\"", str->length, str->chars);
+    return buf.string;
   }
   case OBJ_NATIVE: {
     char *buf;
-    asprintf(&buf, "<native '%s'>",
+    asprintf(&buf, "<native %s>",
              vmake_obj_to_string((vmake_obj *)((vmake_obj_native *)obj)->name));
     return buf;
   }
   case OBJ_ARRAY: {
     vmake_value_array *arr = ((vmake_obj_array *)obj)->array;
-    char *buf = malloc(sizeof(char) * 2);
-    buf[0] = '[';
+    vmake_string_buf buf;
+    vmake_string_buf_new(&buf);
+    vmake_string_buf_append(&buf, "[");
     int len = 1;
     for (int i = 0; i < arr->size; i++) {
-      char *tmp = vmake_value_to_string(arr->values[i]);
-      int tmp_len = strlen(tmp);
-      buf = realloc(buf, len + tmp_len + 4);
-      memcpy(buf + len, tmp, tmp_len);
-      len += tmp_len;
+      char *element = vmake_value_to_string(arr->values[i]);
+      vmake_string_buf_append(&buf, "%s", element);
+      free(element);
       if (i != arr->size - 1) {
-        memcpy(buf + len, ", ", 2);
-        len += 2;
+        vmake_string_buf_append(&buf, ", ");
       }
     }
-    buf[len] = ']';
-    buf[len + 1] = '\0';
-    return buf;
+    vmake_string_buf_append(&buf, "]");
+    return buf.string;
   }
   case OBJ_CLASS: {
     char *class_name = vmake_obj_to_string((vmake_obj *)((vmake_obj_class *)obj)->name);
     char *buf;
-    asprintf(&buf, "<class '%s'>", class_name);
+    asprintf(&buf, "<class %s>", class_name);
     free(class_name);
     return buf;
   }
   case OBJ_INSTANCE: {
     char *class_name = vmake_obj_to_string((vmake_obj *)((vmake_obj_instance *)obj)->klass->name);
     char *buf;
-    asprintf(&buf, "<instance '%s'>", class_name);
+    asprintf(&buf, "<instance %s>", class_name);
     free(class_name);
     return buf;
   }
   case OBJ_METHOD: {
     char *method_name = vmake_obj_to_string((vmake_obj *)((vmake_obj_method *)obj)->name);
     char *buf;
-    asprintf(&buf, "<method '%s'>", method_name);
+    asprintf(&buf, "<method %s>", method_name);
     free(method_name);
+    return buf;
+  }
+  case OBJ_TABLE: {
+    vmake_table *table = ((vmake_obj_table *)obj)->table;
+    vmake_string_buf buf;
+    vmake_string_buf_new(&buf);
+    vmake_string_buf_append(&buf, "{");
+    bool first = true;
+    for (int i = 0; i < table->capacity; i++) {
+      vmake_table_entry entry = table->entries[i];
+      if (entry.key.type != VAL_EMPTY) {
+        char *key = vmake_value_to_string(entry.key);
+        char *value = vmake_value_to_string(*entry.value);
+        if (!first)
+          vmake_string_buf_append(&buf, ", ");
+        vmake_string_buf_append(&buf, "%s=%s", key, value);
+        free(value);
+        free(key);
+        first = false;
+      }
+    }
+    vmake_string_buf_append(&buf, "}");
+    return buf.string;
+    break;
+  }
+  default: {
+    char *buf;
+    asprintf(&buf, "<obj %s>", vmake_obj_type_to_string(obj->type));
     return buf;
   }
   }
@@ -229,5 +257,17 @@ vmake_obj_method *vmake_obj_method_new(vmake_state *state, const char *name,
 
 void vmake_obj_method_free(vmake_obj_method *obj) {
   vmake_obj_string_free(obj->name);
+  free(obj);
+}
+
+vmake_obj_table *vmake_obj_table_new(vmake_state *state, vmake_table table) {
+  vmake_obj_table *obj = OBJ_NEW(vmake_obj_table, OBJ_TABLE);
+  obj->table = malloc(sizeof(table));
+  *obj->table = table;
+  return obj;
+}
+
+void vmake_obj_table_free(vmake_obj_table *obj) {
+  free(obj->table);
   free(obj);
 }

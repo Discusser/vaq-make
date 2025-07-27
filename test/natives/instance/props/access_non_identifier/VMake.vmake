@@ -1,0 +1,1 @@
+print(executable("a",["src/main.c"]).true);

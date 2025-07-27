@@ -1,0 +1,1 @@
+print(executable("test",["src/main.c"]));

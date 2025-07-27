@@ -19,6 +19,7 @@ typedef enum vmake_obj_type {
   OBJ_CLASS,
   OBJ_INSTANCE,
   OBJ_METHOD,
+  OBJ_TABLE,
 } vmake_obj_type;
 
 typedef struct vmake_obj {
@@ -73,6 +74,11 @@ typedef struct vmake_obj_method {
   int arity;
 } vmake_obj_method;
 
+typedef struct vmake_obj_table {
+  vmake_obj obj;
+  vmake_table *table;
+} vmake_obj_table;
+
 char *vmake_obj_type_to_string(vmake_obj_type type);
 
 vmake_obj *vmake_obj_new(vmake_state *state, size_t size, vmake_obj_type type);
@@ -104,3 +110,6 @@ void vmake_obj_instance_free(vmake_obj_instance *obj);
 vmake_obj_method *vmake_obj_method_new(vmake_state *state, const char *name,
                                        vmake_native_method method, int arity);
 void vmake_obj_method_free(vmake_obj_method *obj);
+
+vmake_obj_table *vmake_obj_table_new(vmake_state *state, vmake_table table);
+void vmake_obj_table_free(vmake_obj_table *obj);

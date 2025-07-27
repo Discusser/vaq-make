@@ -151,8 +151,15 @@ bool is_identifier_char(char c, bool first) {
 }
 
 vmake_token make_number(vmake_scanner *scanner) {
+  // Whole part
   while (isdigit(peek(scanner))) {
     consume(scanner);
+  }
+  // Fractional part
+  if (match(scanner, '.')) {
+    while (isdigit(peek(scanner))) {
+      consume(scanner);
+    }
   }
 
   return make_token(scanner, TOKEN_NUMBER);

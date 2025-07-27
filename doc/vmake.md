@@ -35,6 +35,8 @@ digit_excluding_zero = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 digit = "0" | digit_excluding_zero ;
 ```
 
+Note that comments are also allowed in VMake, and can be started with a `#`. They only span on one line.
+
 ## Basic C program
 
 Consider a C program with the following structure:

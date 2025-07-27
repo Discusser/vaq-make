@@ -1,0 +1,9 @@
+print(3 == 5);
+print(3 == 3);
+print("test" == "test");
+print("test" != "test");
+print("abc" != "afc");
+print("abc" == "afc");
+print([1,2,3] == [1,2,3]);
+print(3 == "hello");
+print(3 == "3");

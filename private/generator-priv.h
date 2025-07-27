@@ -1,6 +1,5 @@
 #pragma once
 
-#include "generator.h"
 #include "object.h"
 #include "scanner.h"
 #include <stdbool.h>
@@ -11,7 +10,7 @@ void print_statement(vmake_gen *gen);
 void include_statement(vmake_gen *gen);
 void expression_statement(vmake_gen *gen);
 vmake_value expression(vmake_gen *gen);
-vmake_value assigment(vmake_gen *gen);
+vmake_value assignment(vmake_gen *gen);
 vmake_value equality(vmake_gen *gen);
 vmake_value comparison(vmake_gen *gen);
 vmake_value term(vmake_gen *gen);

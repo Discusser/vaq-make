@@ -23,6 +23,10 @@ static void error_at(vmake_gen *gen, vmake_token token, vmake_error_context ctx,
 static void error_at_current(vmake_gen *gen, vmake_error_context ctx, const char *message);
 
 static vmake_value *pop(vmake_gen *gen);
+static void push(vmake_gen *gen, vmake_value *val);
+static void push_obj(vmake_gen *gen, vmake_obj *obj);
+// Equivalent to pop(gen) followed by push(gen, val);
+static void modify_top(vmake_gen *gen, vmake_value *val);
 
 bool vmake_generate_build(vmake_scanner *scanner, vmake_state *state, const char *file_path) {
   vmake_gen gen;
@@ -109,7 +113,7 @@ static void error(vmake_gen *gen, vmake_error_context ctx, const char *message) 
 
 static void error_at(vmake_gen *gen, vmake_token token, vmake_error_context ctx,
                      const char *message) {
-  vmake_error(gen, CTX_USER, &token, message);
+  vmake_error_exit(gen, CTX_USER, &token, message);
 }
 
 static void error_at_current(vmake_gen *gen, vmake_error_context ctx, const char *message) {
@@ -137,10 +141,12 @@ void print_statement(vmake_gen *gen) {
   vmake_value_print(grouping(gen));
   printf("\n");
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after print ')'.");
+  pop(gen);
 }
 
 void include_statement(vmake_gen *gen) {
   vmake_value val = expression(gen);
+  pop(gen);
   if (!vmake_value_is_string(val)) {
     error(gen, CTX_SYNTAX, "Expected string after 'include'");
     return;
@@ -149,7 +155,7 @@ void include_statement(vmake_gen *gen) {
   if (vmake_value_array_contains(&gen->state->include_stack, val)) {
     char *val_str = vmake_value_to_string(val);
     char *str;
-    asprintf(&str, "Cyclic include detected while including '%s'", val_str);
+    asprintf(&str, "Cyclic include detected while including %s", val_str);
     error(gen, CTX_USER, str);
     free(str);
     free(val_str);
@@ -157,7 +163,7 @@ void include_statement(vmake_gen *gen) {
   }
 
   char *include_path = ((vmake_obj_string *)val.as.obj)->chars;
-  printf("Including '%s'\n", include_path);
+  printf("Including %s\n", include_path);
   char *new_path = vmake_path_rel(gen->file_path, include_path);
   if (new_path == NULL) {
     char *str;
@@ -175,24 +181,40 @@ void include_statement(vmake_gen *gen) {
 void expression_statement(vmake_gen *gen) {
   expression(gen);
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after expression.");
+  pop(gen);
 }
 
-vmake_value expression(vmake_gen *gen) { return assigment(gen); }
+vmake_value expression(vmake_gen *gen) {
+  int before = gen->stack_size;
+  vmake_value res = assignment(gen);
+  // An expression always produces a result. With our recursive-descent parser, we return that
+  // result to the calling function, but sometimes we want to return a pointer to the result (for
+  // variables), and we can do that via the stack. If there was no pointer pushed to the stack, we
+  // push NULL so that statements don't pop too many variables from the stack. This is definitely
+  // not the best way to handle this type of problem, but it's a limitation of the fact that we
+  // perform everything in a single pass.
+  if (gen->stack_size == before) {
+    push(gen, NULL);
+  }
+  return res;
+}
 
-vmake_value assigment(vmake_gen *gen) {
+vmake_value assignment(vmake_gen *gen) {
   bool is_identifier = check(gen, TOKEN_IDENTIFIER);
   vmake_value val = equality(gen);
   vmake_token prev = previous(gen);
 
   if (match(gen, TOKEN_EQUAL)) {
     // If the left hand side is an identifier, then the pointer should be on the stack.
-    vmake_value *val_ptr = resolve_variable(gen, prev);
-    vmake_value rhs = assigment(gen);
+    // vmake_value *val_ptr = resolve_variable(gen, prev);
+    vmake_value *val_ptr = pop(gen);
+    vmake_value rhs = assignment(gen);
     if (is_identifier) {
       assign_variable(gen, val_ptr, rhs);
     } else {
       error(gen, CTX_USER, "Invalid assignment target.");
     }
+    push(gen, val_ptr);
     return rhs;
   }
 
@@ -332,7 +354,8 @@ vmake_value subscript(vmake_gen *gen) {
   vmake_token prev = previous(gen);
 
   while (match(gen, TOKEN_LEFT_SQUARE_BRACKET)) {
-    vmake_value *target = resolve_variable(gen, prev);
+    vmake_value *target = pop(gen);
+    // vmake_value *target = resolve_variable(gen, prev);
 
     if (target == NULL) {
       error(gen, CTX_USER, "Cannot index into null value.");
@@ -342,7 +365,7 @@ vmake_value subscript(vmake_gen *gen) {
     vmake_value index = expression(gen);
     if (index.type != VAL_NUMBER) {
       char *str;
-      asprintf(&str, "Expected number for array subscript, found '%s' instead.",
+      asprintf(&str, "Expected number for array subscript, found %s instead.",
                vmake_value_to_string(index));
       error(gen, CTX_USER, str);
       free(str);
@@ -360,7 +383,7 @@ vmake_value subscript(vmake_gen *gen) {
 
     if (!vmake_value_is_array(*target)) {
       char *str;
-      asprintf(&str, "Expected array as subscript target, found '%s' instead.",
+      asprintf(&str, "Expected array as subscript target, found %s instead.",
                vmake_value_to_string(*target));
       error(gen, CTX_USER, str);
       free(str);
@@ -379,8 +402,15 @@ vmake_value subscript(vmake_gen *gen) {
 
     // Once we've checked all the possibles cases, we can finally just index into the array.
     val = arr->array->values[index_trunc];
+    push(gen, arr->array->values + index_trunc);
 
     consume_expected(gen, TOKEN_RIGHT_SQUARE_BRACKET, "Expected ']' after array subscript.");
+
+    // if (match(gen, TOKEN_EQUAL)) {
+    //   vmake_value rhs = assignment(gen);
+    //   assign_variable(gen, arr->array->values + index_trunc, rhs);
+    // } else {
+    // }
   }
 
   return val;
@@ -390,6 +420,7 @@ vmake_value call(vmake_gen *gen) {
   vmake_value val = primary(gen);
 
   while (true) {
+    vmake_token prev = previous(gen);
     if (match(gen, TOKEN_LEFT_PAREN)) {
       vmake_arguments args = arguments(gen);
       consume_expected(gen, TOKEN_RIGHT_PAREN, "Expected ')' after argument list");
@@ -399,7 +430,7 @@ vmake_value call(vmake_gen *gen) {
         val = call_native(gen, val, &args);
         break;
       default:
-        error(gen, CTX_USER, "Object is not callable.");
+        error_at(gen, prev, CTX_USER, "Object is not callable.");
       }
 
       vmake_value_array_free(&args.args);
@@ -410,9 +441,9 @@ vmake_value call(vmake_gen *gen) {
       if (!vmake_value_is_instance(val)) {
         char *buf;
         asprintf(&buf, "Expected instance for property access, but found %s instead.",
-                 prop.type == VAL_OBJ ? vmake_obj_type_to_string(prop.as.obj->type)
-                                      : vmake_value_type_to_string(prop.type));
-        error(gen, CTX_USER, buf);
+                 val.type == VAL_OBJ ? vmake_obj_type_to_string(val.as.obj->type)
+                                     : vmake_value_type_to_string(val.type));
+        error_at(gen, prev, CTX_USER, buf);
         free(buf);
         break;
       }
@@ -425,8 +456,8 @@ vmake_value call(vmake_gen *gen) {
           char *buf;
           char *prop_str = vmake_value_to_string(prop);
           char *class_str = vmake_obj_to_string((vmake_obj *)inst->klass->name);
-          asprintf(&buf, "Invalid property '%s' on instance of '%s'.", prop_str, class_str);
-          error(gen, CTX_USER, buf);
+          asprintf(&buf, "Invalid property %s on instance of %s.", prop_str, class_str);
+          error_at(gen, prev, CTX_USER, buf);
           free(class_str);
           free(prop_str);
           free(buf);
@@ -489,21 +520,26 @@ vmake_arguments arguments(vmake_gen *gen) {
     if (check(gen, TOKEN_RIGHT_PAREN))
       break;
 
-    if (!read_args && check(gen, TOKEN_IDENTIFIER)) {
+    vmake_value key = assignment(gen);
+    vmake_token key_token = previous(gen);
+    if (check(gen, TOKEN_EQUAL)) {
       read_args = true;
-    }
-    if (!read_args) {
-      vmake_value_array_push(&arr.args, assigment(gen));
+      if (key_token.type != TOKEN_IDENTIFIER) {
+        error_at(gen, key_token, CTX_SYNTAX, "Expected keyword argument name.");
+      } else {
+        consume_expected(gen, TOKEN_EQUAL, "Expected '=' after keyword argument name.");
+        vmake_value value = expression(gen);
+        vmake_table_put_cpy(&arr.kwargs, key, value);
+      }
     } else {
-      consume_expected(
-          gen, TOKEN_IDENTIFIER,
-          "Expected keyword argument name."); // This should technically never throw since we check
-                                              // for TOKEN_IDENTIFIER beforehand
-      vmake_value key = identifier_string(gen);
-      consume_expected(gen, TOKEN_EQUAL, "Expected '=' after keyword argument name.");
-      vmake_value value = expression(gen);
-      vmake_table_put_cpy(&arr.kwargs, key, value);
+      if (read_args) {
+        error_at(gen, key_token, CTX_USER,
+                 "Positional arguments must be placed before keyword arguments.");
+      } else {
+        vmake_value_array_push(&arr.args, key);
+      }
     }
+
   } while (match(gen, TOKEN_COMMA));
   return arr;
 }
@@ -517,11 +553,15 @@ vmake_value grouping(vmake_gen *gen) {
 vmake_value array(vmake_gen *gen) {
   vmake_value_array arr;
   vmake_value_array_new(&arr);
-  do {
-    vmake_value_array_push(&arr, assigment(gen));
-  } while (match(gen, TOKEN_COMMA));
+  if (!check(gen, TOKEN_RIGHT_SQUARE_BRACKET)) {
+    do {
+      vmake_value_array_push(&arr, assignment(gen));
+    } while (match(gen, TOKEN_COMMA));
+  }
   consume_expected(gen, TOKEN_RIGHT_SQUARE_BRACKET, "Expected ']' after array.");
-  return vmake_value_obj((vmake_obj *)vmake_obj_array_new(gen->state, arr));
+  vmake_obj *obj = (vmake_obj *)vmake_obj_array_new(gen->state, arr);
+  push_obj(gen, obj);
+  return vmake_value_obj(obj);
 }
 
 vmake_value number(vmake_gen *gen) { return vmake_value_number(atof(previous(gen).name)); }
@@ -557,6 +597,7 @@ vmake_value identifier_variable(vmake_gen *gen) {
   }
 
   // gen->stack[gen->stack_size++] = res;
+  push(gen, res);
   return *res;
 }
 
@@ -572,7 +613,7 @@ vmake_value call_native(vmake_gen *gen, vmake_value val, vmake_arguments *args) 
   if (native->arity != args->args.size) {
     char *str;
     char *native_name = vmake_obj_to_string((vmake_obj *)native);
-    asprintf(&str, "Expected %i positional arguments for '%s' but found %i instead.", native->arity,
+    asprintf(&str, "Expected %i positional arguments for %s but found %i instead.", native->arity,
              native_name, args->args.size);
     free(native_name);
     error(gen, CTX_USER, str);
@@ -589,7 +630,7 @@ vmake_value call_method(vmake_gen *gen, vmake_value val, vmake_obj_instance *cal
     char *method_name = vmake_obj_to_string((vmake_obj *)method);
     char *class_name = vmake_obj_to_string((vmake_obj *)caller->klass);
     asprintf(&str,
-             "Expected %i positional arguments for method '%s' of class '%s' but found %i instead.",
+             "Expected %i positional arguments for method %s of class %s but found %i instead.",
              method->arity, method_name, class_name, args->args.size);
     free(class_name);
     free(method_name);
@@ -660,5 +701,21 @@ vmake_value *create_global(vmake_gen *gen, vmake_token name) {
 
 static vmake_value *pop(vmake_gen *gen) {
   return gen->stack_size == 0 ? (error(gen, CTX_INTERNAL, "Tried to pop from empty stack."), NULL)
-                              : gen->stack[gen->stack_size--];
+                              : gen->stack[--gen->stack_size];
 }
+
+static void push(vmake_gen *gen, vmake_value *val) {
+  if (gen->stack_size == 256) {
+    error(gen, CTX_INTERNAL, "Stack overflow.");
+  } else {
+    gen->stack[gen->stack_size++] = val;
+  }
+}
+
+static void push_obj(vmake_gen *gen, vmake_obj *obj) {
+  vmake_value *val = malloc(sizeof(vmake_value));
+  *val = vmake_value_obj(obj);
+  push(gen, val);
+}
+
+static void modify_top(vmake_gen *gen, vmake_value *val) { gen->stack[gen->stack_size - 1] = val; }

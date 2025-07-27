@@ -1,0 +1,10 @@
+my_var = "hello";
+my_arr = [my_var, 3];
+
+print(my_var);
+print(my_arr);
+
+my_var = "my_arr";
+
+print(my_var);
+print(my_arr);
