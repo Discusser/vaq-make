@@ -241,6 +241,14 @@ void vmake_obj_instance_add_field(vmake_obj_instance *obj, vmake_state *state, c
   vmake_table_put_cpy(&obj->fields, key, value);
 }
 
+vmake_value vmake_obj_instance_get_field(vmake_obj_instance *obj, vmake_state *state,
+                                         const char *name) {
+  vmake_value key = vmake_value_obj((vmake_obj *)vmake_obj_string_const(state, name));
+  vmake_value *ret = NULL;
+  vmake_table_get_or_nil(&obj->fields, key, &ret);
+  return *ret;
+}
+
 void vmake_obj_instance_free(vmake_obj_instance *obj) {
   vmake_table_free(&obj->fields);
   free(obj);

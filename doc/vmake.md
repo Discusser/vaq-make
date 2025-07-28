@@ -23,7 +23,7 @@ subscript = call ( "[" expression "]" )* ;
 call = primary ( ( "(" arguments? ")" ) | ( "." identifier ) )*;
 primary = number | string | literal | array | grouping | identifier ;
 
-arguments = assignment ( "," assignment )* ( "," identifier "=" assignment )* ;
+arguments = assignment ( "," equality )* ( "," identifier "=" equality )* ;
 grouping = "(" expression ")" ;
 number = digit_excluding_zero digit* ;
 string = """ ascii_character_excluding_zero """ ;
@@ -43,11 +43,23 @@ Consider a C program with the following structure:
 
 ```tree
 ├── build
-├── VMake.txt
+├── VMake.vmake
 ├── include
 │   └── myprog.h
-├── private
-│   └── myprog-priv.h
 └── src
     └── myprog.c
 ```
+
+An example of a VMake file for this program would be:
+
+```vmake
+executable(
+  "myprog", 
+  sources=[
+    "src/myprog.c", 
+  ],
+  include_directories=["include"],
+  link_libraries=["m"]); # if you want the math library for example, equivalent to -lm
+```
+
+The build directory can then be populated with `vaq-make VMake.vmake . build/`. Inside, a Makefile with different targets will be generated. Most useful to the user are the targets that have the same names as the ones defined in the VMake file (in this case, "myprog"). The generated Makefile is also capable of regenerating the build configuration whenever changes are made to the source VMake file.

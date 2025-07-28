@@ -105,6 +105,8 @@ void vmake_obj_class_free(vmake_obj_class *obj);
 vmake_obj_instance *vmake_obj_instance_new(vmake_state *state, vmake_obj_class *klass);
 void vmake_obj_instance_add_field(vmake_obj_instance *obj, vmake_state *state, const char *name,
                                   vmake_value value);
+vmake_value vmake_obj_instance_get_field(vmake_obj_instance *obj, vmake_state *state,
+                                         const char *name);
 void vmake_obj_instance_free(vmake_obj_instance *obj);
 
 vmake_obj_method *vmake_obj_method_new(vmake_state *state, const char *name,

@@ -8,7 +8,14 @@ I made this project to learn a bit more about domain-specific languages, and bec
 
 ## Usage
 
-This project provides a `vaq-make` executable. One command line argument can be passed: the name of the file to be processed. This is expected to be a VMake file (optionally with the `.vmake` extension, even though that doesn't matter). The grammar for the VMake language can be found in the documentation.
+This project provides a `vaq-make` executable. The grammar for the VMake language can be found in the documentation. The `vaq-make` executable's usage is as follows:
+
+```
+Usage: vaq-make [vmake_file] [source_directory] [build_directory]
+```
+
+`vmake_file` is preferably a file with a `.vmake` extension.
+`source_directory` is the directory where the source files are located, and `build_directory` is the directory where the Makefile should be generated.
 
 ## Building
 

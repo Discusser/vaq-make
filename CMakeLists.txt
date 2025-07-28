@@ -10,6 +10,7 @@ add_executable(
   src/native/class.c
   src/native/fun.c
   src/array.c
+  src/config.c
   src/file.c
   src/generator.c
   src/object.c

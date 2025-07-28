@@ -1,17 +1,20 @@
 #include "common.h"
+#include "config.h"
 #include "file.h"
 #include "generator.h"
 #include "object.h"
 #include "scanner-priv.h"
 #include "scanner.h"
+#include <libgen.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s [vmake_file]\n", argv[0]);
+  if (argc != 2 && argc != 4) {
+    printf("Usage: %s [vmake_file] [source_directory] [build_directory]\n", argv[0]);
     exit(1);
   }
 
@@ -19,14 +22,36 @@ int main(int argc, char *argv[]) {
   vmake_table_init(&state.globals);
   vmake_table_init(&state.strings);
   vmake_value_array_new(&state.include_stack);
+  vmake_value_array_new(&state.make.targets);
   state.had_error = false;
   state.panic_mode = false;
   state.objects = NULL;
+  state.argc = argc;
+  state.argv = argv;
 
-  char *path = realpath(argv[1], NULL);
-  vmake_process_path(&state, path);
-  free(path);
+  argv[1] = realpath(argv[1], NULL);
+  state.root_file = argv[1];
+  vmake_process_path(&state, argv[1]);
+  char *path_copy = strdup(argv[1]);
+  if (argc == 4) {
+    char *src = realpath(argv[2], NULL);
+    if (src == NULL)
+      vmake_error_exit(NULL, CTX_USER, NULL, "Directory at '%s' doesn't exist", argv[2]);
+    argv[2] = src;
+    char *build = realpath(argv[3], NULL);
+    if (build == NULL)
+      vmake_error_exit(NULL, CTX_USER, NULL, "Directory at '%s' doesn't exist", argv[3]);
+    argv[3] = build;
+    vmake_build_makefiles(&state, argv[3], argv[2]);
+    free(argv[2]);
+    free(argv[3]);
+  } else {
+    vmake_build_makefiles(&state, dirname(path_copy), ".");
+  }
+  free(path_copy);
+  free(argv[1]);
 
+  vmake_value_array_free(&state.make.targets);
   vmake_value_array_free(&state.include_stack);
   vmake_table_free(&state.strings);
   vmake_table_free(&state.globals);
@@ -87,15 +112,17 @@ void vmake_verror(vmake_gen *gen, vmake_error_context context, vmake_token *toke
 
   if (filename_is_path)
     free(filename);
-  for (int i = gen->state->include_stack.size - 2; i >= 0; i--) {
-    char *str = ((vmake_obj_string *)gen->state->include_stack.values[i].as.obj)->chars;
-    char *rel_path = vmake_path_abs_to_rel(str);
-    printf("  included from %s\n", rel_path);
-    free(rel_path);
-    free(str);
-  }
+  if (gen) {
+    for (int i = gen->state->include_stack.size - 2; i >= 0; i--) {
+      char *str = ((vmake_obj_string *)gen->state->include_stack.values[i].as.obj)->chars;
+      char *rel_path = vmake_path_abs_to_rel(str);
+      printf("  included from %s\n", rel_path);
+      free(rel_path);
+      free(str);
+    }
 
-  gen->state->had_error = true;
+    gen->state->had_error = true;
+  }
 }
 
 void vmake_error(vmake_gen *gen, vmake_error_context context, vmake_token *token, const char *fmt,

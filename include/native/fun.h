@@ -5,6 +5,7 @@
 void vmake_define_native_functions(vmake_state *state);
 void vmake_define_native_function(vmake_state *state, const char *name, vmake_native_function fn,
                                   int argc);
+vmake_value vmake_kwargs_get(vmake_gen *gen, vmake_table kwargs, const char *value);
 
 // TODO: Start adding and implementing these functions. These are the core of the VMake language,
 // because VMake in itself is not designed to be Turing complete.

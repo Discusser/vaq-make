@@ -97,7 +97,7 @@ bool vmake_table_get(vmake_table *table, vmake_value key, vmake_value **value) {
 
 bool vmake_table_get_or_nil(vmake_table *table, vmake_value key, vmake_value **value) {
   bool ret = vmake_table_get(table, key, value);
-  if (value == NULL) {
+  if (*value == NULL) {
     vmake_table_put_cpy_ret(table, key, vmake_value_nil(), value);
   }
   return ret;

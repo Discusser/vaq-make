@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 char *vmake_path_abs(const char *path) { return realpath(path, NULL); }
@@ -12,21 +13,37 @@ char *vmake_path_rel(const char *current, const char *relative) {
   if (*relative == '/')
     return strdup(relative);
 
-  int current_len = strlen(current);
-  char *current_copy = malloc(sizeof(char) * (current_len + 2));
-  strcpy(current_copy, current);
-  char *end = strrchr(current_copy, '/');
-  // If we found a last '/' character, and current is not only a '/', then end the path right after
-  if (end != NULL && current_len > 0) {
-    *(end + 1) = '\0';
-  } else if (end == NULL) { // If there is no '/' character, the path is a file name, therefore we
-                            // can discard it
-    *current_copy = '\0';
+  int current_to_copy = 0;
+  bool add_slash = false;
+  int relative_to_copy = 0;
+
+  struct stat path_stat;
+  stat(current, &path_stat);
+  if (S_ISDIR(path_stat.st_mode)) {
+    // If current is a directory, we want to copy the whole string, plus a trailing slash if there
+    // is none
+    current_to_copy = strlen(current);
+    if (current[current_to_copy - 1] != '/')
+      add_slash = true;
+  } else {
+    // If current is a file path, we want to discard the filename
+    // We just want to copy the directory name followed by a slash
+    current_to_copy = strrchr(current, '/') - current;
+    add_slash = true;
   }
-  current_copy = realloc(current_copy, sizeof(char) * (current_len + strlen(relative) + 2));
-  strcat(current_copy, relative);
-  char *real = realpath(current_copy, NULL);
-  free(current_copy);
+
+  int len = current_to_copy + strlen(relative);
+  if (add_slash)
+    len++;
+  char *out = malloc(sizeof(char) * (len + 1));
+  if (add_slash)
+    sprintf(out, "%.*s/%s", current_to_copy, current, relative);
+  else
+    sprintf(out, "%.*s%s", current_to_copy, current, relative);
+
+  char *real = realpath(out, NULL);
+  free(out);
+
   return real;
 }
 
@@ -74,4 +91,27 @@ char *vmake_path_abs_to_rel(const char *abs) {
     free(cwd);
     return res;
   }
+}
+
+void vmake_create_directory(const char *path) {
+  int path_len = strlen(path);
+  for (int i = 0; i < path_len; i++) {
+    if (path[i] == '/' || path[i + 1] == '\0') {
+      // PERF: This can be optimized by using realloc instead of allocating and freeing each time,
+      // or by just using a char[PATH_MAX]. I don't think this will be too much of an issue in terms
+      // of performance especially since there's file IO involved.
+      int size = path[i + 1] == '\0' ? i + 1 : i;
+      char *subdir = malloc(sizeof(char) * (size + 1));
+      subdir[0] = '\0';
+      strncat(subdir, path, size);
+      mkdir(subdir, S_IRWXU);
+      free(subdir);
+    }
+  }
+}
+
+FILE *vmake_new_makefile(const char *path) {
+  FILE *fp = fopen(path, "w");
+
+  return fp;
 }

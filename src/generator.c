@@ -49,8 +49,6 @@ bool vmake_generate_build(vmake_scanner *scanner, vmake_state *state, const char
   }
   consume_expected(&gen, TOKEN_EOF, "Expected end of expression.");
 
-  vmake_value_array_pop(&gen.state->include_stack);
-
   return !gen.state->had_error;
 }
 
@@ -174,8 +172,9 @@ void include_statement(vmake_gen *gen) {
   }
 
   vmake_value_array_push(&gen->state->include_stack, key);
-
   vmake_process_path(gen->state, abs_path);
+  vmake_value_array_pop(&gen->state->include_stack);
+
   free(abs_path);
   consume_expected(gen, TOKEN_SEMICOLON, "Expected ';' after include string.");
 }
@@ -522,26 +521,32 @@ vmake_arguments arguments(vmake_gen *gen) {
     if (check(gen, TOKEN_RIGHT_PAREN))
       break;
 
-    vmake_value key = assignment(gen);
-    vmake_token key_token = previous(gen);
-    if (check(gen, TOKEN_EQUAL)) {
-      read_args = true;
-      if (key_token.type != TOKEN_IDENTIFIER) {
-        error_at(gen, key_token, CTX_SYNTAX, "Expected keyword argument name.");
+    if (match(gen, TOKEN_IDENTIFIER)) {
+      vmake_token identifier_token = previous(gen);
+      if (match(gen, TOKEN_EQUAL)) {
+        vmake_value identifier = vmake_value_obj((vmake_obj *)vmake_obj_string_new(
+            gen->state, (char *)identifier_token.name, identifier_token.name_length, true));
+        vmake_value value = equality(gen);
+        vmake_table_put_cpy(&arr.kwargs, identifier, value);
+        read_args = true;
       } else {
-        consume_expected(gen, TOKEN_EQUAL, "Expected '=' after keyword argument name.");
-        vmake_value value = expression(gen);
-        vmake_table_put_cpy(&arr.kwargs, key, value);
+        if (read_args) {
+          error_at(gen, identifier_token, CTX_USER,
+                   "Positional arguments must be placed before keyword arguments.");
+        } else {
+          vmake_value_array_push(&arr.args, *resolve_variable(gen, identifier_token));
+        }
       }
     } else {
+      vmake_value value = equality(gen);
+      vmake_token value_token = previous(gen);
       if (read_args) {
-        error_at(gen, key_token, CTX_USER,
+        error_at(gen, value_token, CTX_USER,
                  "Positional arguments must be placed before keyword arguments.");
       } else {
-        vmake_value_array_push(&arr.args, key);
+        vmake_value_array_push(&arr.args, value);
       }
     }
-
   } while (match(gen, TOKEN_COMMA));
   return arr;
 }

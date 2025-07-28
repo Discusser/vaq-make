@@ -9,12 +9,28 @@
 
 typedef enum vmake_class_type { CLASS_EXECUTABLE, CLASS_T_MAX } vmake_class_type;
 
+typedef struct vmake_makefile {
+  FILE *fp;
+  char *name;
+  char *dir_path;
+} vmake_makefile;
+
+typedef struct vmake_make_contents {
+  char *build_directory;
+  char *source_directory;
+  vmake_value_array targets;
+} vmake_make_contents;
+
 typedef struct vmake_state {
   vmake_obj *objects;
   vmake_obj_class *classes[CLASS_T_MAX];
   vmake_table globals;
   vmake_table strings;
   vmake_value_array include_stack;
+  vmake_make_contents make;
+  char **argv;
+  char *root_file;
+  int argc;
   bool had_error;
   bool panic_mode;
 } vmake_state;
