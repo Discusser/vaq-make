@@ -32,6 +32,19 @@ make
 
 If you want to build in debug mode, you can pass `-DCMAKE_BUILD_TYPE=Debug` to `cmake`.
 
+### Bootstrapping
+
+If you have faith in `vaq-make` and expect it to work, you can try building `vaq-make` with `vaq-make`. Since no releases are provided, you first have to build `vaq-make` using CMake (refer to the steps above for that). Once you have a `vaq-make` executable, you can run the following commands, assuming you've cloned the repository and are in the root directory:
+
+```shell
+mkdir build-vmake
+./build/vaq-make VMake.vmake . build-vmake/
+cd build-vmake
+make
+```
+
+If no errors occurred, you should have your very own bootstrapped `vaq-make` executable! Use at your own discretion...
+
 ## Documentation
 
 Further documentation can be found in [doc/](doc/)
